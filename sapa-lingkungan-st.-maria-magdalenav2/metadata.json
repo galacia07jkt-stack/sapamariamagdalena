@@ -1,6 +1,0 @@
-{
-  "name": "sapastmariamagdalena-v2",
-  "description": "Sistem Aplikasi Pelayanan Administrasi Pendataan Warga Lingkungan St. Maria Magdalena - Paroki St. Vincentius a Paulo Kediri",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
