@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Accounts",
+      "description": "Pengurus and Warga user accounts for SAPA Kediri",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "password_hash": { "type": "string" },
+        "role": { "type": "string" },
+        "nama_lengkap": { "type": "string" },
+        "no_kk": { "type": "string" }
+      },
+      "required": ["id", "username", "role", "nama_lengkap"]
+    },
+    "kepala_keluarga": {
+      "title": "Kepala Keluarga Data",
+      "description": "Kartu Keluarga Lingkungan records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "no_kk": { "type": "string" },
+        "nama_kepala_keluarga": { "type": "string" },
+        "alamat": { "type": "string" },
+        "rt": { "type": "string" },
+        "rw": { "type": "string" },
+        "wilayah": { "type": "string" },
+        "status_warga": { "type": "string" },
+        "agama_kk": { "type": "string" },
+        "kartu_biru_json": { "type": "string" },
+        "kartu_merah_json": { "type": "string" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" },
+        "created_by_user": { "type": "string" }
+      },
+      "required": ["id", "no_kk", "nama_kepala_keluarga"]
+    },
+    "anggota_keluarga": {
+      "title": "Anggota Keluarga Data",
+      "description": "Individual family members data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "id_keluarga": { "type": "string" },
+        "no_kk": { "type": "string" },
+        "nik": { "type": "string" },
+        "nama_lengkap": { "type": "string" },
+        "nama_panggilan": { "type": "string" },
+        "jenis_kelamin": { "type": "string" },
+        "tempat_lahir": { "type": "string" },
+        "tanggal_lahir": { "type": "string" },
+        "golongan_darah": { "type": "string" },
+        "hub_keluarga": { "type": "string" },
+        "no_hp": { "type": "string" },
+        "pendidikan_terakhir": { "type": "string" },
+        "masih_sekolah": { "type": "number" },
+        "nama_sekolah": { "type": "string" },
+        "alamat_sekolah": { "type": "string" },
+        "pekerjaan": { "type": "string" },
+        "nama_perusahaan": { "type": "string" },
+        "alamat_perusahaan": { "type": "string" },
+        "agama": { "type": "string" },
+        "baptis_json": { "type": "string" },
+        "komuni_json": { "type": "string" },
+        "krisma_json": { "type": "string" },
+        "perkawinan_json": { "type": "string" },
+        "status_perkawinan": { "type": "string" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "id_keluarga", "no_kk", "nama_lengkap"]
+    }
+  }
+}
