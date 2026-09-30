@@ -1,0 +1,324 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from 'react';
+import { Navbar } from './components/Navbar';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { ParishHeader } from './components/ParishHeader';
+import { FormInputWarga } from './components/FormInputWarga';
+import { CekUlangWarga } from './components/CekUlangWarga';
+import { AdminDashboard } from './components/AdminDashboard';
+import { AdminTable } from './components/AdminTable';
+import { AdminLoginModal } from './components/AdminLoginModal';
+import { EditWargaModal } from './components/EditWargaModal';
+import { BuktiRegistrasiModal } from './components/BuktiRegistrasiModal';
+import { EnkripsiSecurityModal } from './components/EnkripsiSecurityModal';
+import { SapaLogo } from './components/SapaLogo';
+import { WargaKatolik, StatistikParoki } from './types';
+import { 
+  getStoredWarga, 
+  hitungStatistikParoki, 
+  isAdminAuthenticated, 
+  logoutAdmin 
+} from './utils/storage';
+import { 
+  ShieldCheck, 
+  MapPin, 
+  Phone, 
+  FileSpreadsheet, 
+  CheckCircle2
+} from 'lucide-react';
+
+export default function App() {
+  const [wargaList, setWargaList] = useState<WargaKatolik[]>([]);
+  const [activeTab, setActiveTab] = useState<'input' | 'cek' | 'admin'>('input');
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [securityVaultOpen, setSecurityVaultOpen] = useState(false);
+  const [editingWarga, setEditingWarga] = useState<WargaKatolik | null>(null);
+  const [viewingBukti, setViewingBukti] = useState<WargaKatolik | null>(null);
+
+  // Sync data from storage
+  const refreshData = () => {
+    const data = getStoredWarga();
+    setWargaList(data);
+    setIsAdmin(isAdminAuthenticated());
+  };
+
+  useEffect(() => {
+    refreshData();
+
+    const handleUpdate = () => {
+      refreshData();
+    };
+
+    const handleAuth = () => {
+      setIsAdmin(isAdminAuthenticated());
+    };
+
+    window.addEventListener('sapa-warga-updated', handleUpdate);
+    window.addEventListener('sapa-auth-changed', handleAuth);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('sapa-warga-updated', handleUpdate);
+      window.removeEventListener('sapa-auth-changed', handleAuth);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const stats: StatistikParoki = React.useMemo(() => {
+    return hitungStatistikParoki(wargaList);
+  }, [wargaList]);
+
+  // Handle citizen registration success
+  const handleWargaRegistered = (newWarga: WargaKatolik) => {
+    refreshData();
+    setViewingBukti(newWarga);
+  };
+
+  // Handle admin login success
+  const handleAdminLoginSuccess = () => {
+    setIsAdmin(true);
+    setActiveTab('admin');
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    logoutAdmin();
+    setIsAdmin(false);
+    setSecurityVaultOpen(false);
+    if (activeTab === 'admin') {
+      setActiveTab('input');
+    }
+  };
+
+  // Enkripsi hanya bisa dibuka hanya di akses admin
+  const handleOpenSecurityVault = () => {
+    if (isAdmin) {
+      setSecurityVaultOpen(true);
+    } else {
+      setLoginModalOpen(true);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-sky-50/50 text-slate-800 selection:bg-orange-100 selection:text-orange-900">
+      
+      {/* Top Parish Navigation Bar with Official SAPA Logo */}
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={(tab) => {
+          if (tab === 'admin' && !isAdmin) {
+            setLoginModalOpen(true);
+          } else {
+            setActiveTab(tab);
+          }
+        }}
+        isAdmin={isAdmin}
+        onOpenLogin={() => setLoginModalOpen(true)}
+        onLogout={handleLogout}
+        onOpenSecurityVault={handleOpenSecurityVault}
+        totalJiwa={wargaList.length}
+      />
+
+      {/* Main Container - Added pb-24 for mobile bottom navigation clearance */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-7 pb-24 md:pb-12">
+        
+        {/* Hero Header with Parish Details and SAPA Logo */}
+        <ParishHeader
+          stats={stats}
+          onCekDataClick={() => setActiveTab('cek')}
+          onDaftarClick={() => setActiveTab('input')}
+        />
+
+        {/* Tab 1: Input Data Warga */}
+        {activeTab === 'input' && (
+          <div className="animate-fade-in">
+            <FormInputWarga onSuccess={handleWargaRegistered} />
+          </div>
+        )}
+
+        {/* Tab 2: Cek Ulang & Verifikasi Mandiri */}
+        {activeTab === 'cek' && (
+          <div className="animate-fade-in">
+            <CekUlangWarga
+              onOpenBukti={(w) => setViewingBukti(w)}
+              onGoToInput={() => setActiveTab('input')}
+            />
+          </div>
+        )}
+
+        {/* Tab 3: Portal Admin & Pelaporan Excel */}
+        {activeTab === 'admin' && isAdmin && (
+          <div className="space-y-6 sm:space-y-8 animate-fade-in">
+            {/* Statistics Section */}
+            <AdminDashboard stats={stats} wargaList={wargaList} />
+
+            {/* Excel Reporting & Management Table */}
+            <AdminTable
+              wargaList={wargaList}
+              onAddNew={() => setActiveTab('input')}
+              onEdit={(w) => setEditingWarga(w)}
+              onViewBukti={(w) => setViewingBukti(w)}
+            />
+          </div>
+        )}
+
+      </main>
+
+      {/* Mobile Bottom Navigation Bar for Android & iPhone */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        setActiveTab={(tab) => {
+          if (tab === 'admin' && !isAdmin) {
+            setLoginModalOpen(true);
+          } else {
+            setActiveTab(tab);
+          }
+        }}
+        isAdmin={isAdmin}
+        onOpenLogin={() => setLoginModalOpen(true)}
+        onOpenSecurityVault={handleOpenSecurityVault}
+      />
+
+      {/* Parish Footer with Official SAPA Logo */}
+      <footer className="bg-sky-950 text-white border-t-4 border-orange-500 mt-12 sm:mt-16 pb-20 md:pb-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            {/* Column 1: Parish Info with New Logo */}
+            <div className="space-y-3.5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-white p-0.5 border-2 border-orange-400 overflow-hidden flex items-center justify-center shrink-0">
+                  <img
+                    src="/logo-sapa.png"
+                    alt="Logo SAPA"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div>
+                  <h3 className="font-black text-base sm:text-lg tracking-wide text-orange-400">
+                    SAPA ST. MARIA MAGDALENA
+                  </h3>
+                  <p className="text-xs text-sky-200">
+                    Semampir Kota Kediri
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Sistem Administrasi dan Pendataan Warga Katolik Lingkungan St. Maria Magdalena Semampir, 
+                Paroki St. Vincentius a Paulo Kota Kediri — Keuskupan Surabaya.
+              </p>
+              <div className="flex items-center gap-2 text-xs text-orange-300 pt-1">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Enkripsi Kriptografi AES-256 Informasi Jemaat</span>
+              </div>
+            </div>
+
+            {/* Column 2: Secretariat & Address */}
+            <div className="space-y-2 text-xs text-slate-300">
+              <h4 className="font-bold text-sm text-white uppercase tracking-wider mb-2">
+                Sekretariat & Wilayah
+              </h4>
+              <div className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                <span>
+                  Kelurahan Semampir, Kecamatan Kota, Kota Kediri, Jawa Timur
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                <span>
+                  Wilayah Paroki St. Vincentius a Paulo Kota Kediri
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Phone className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                <span>
+                  Layanan Koordinasi Lingkungan (WhatsApp Pengurus)
+                </span>
+              </div>
+            </div>
+
+            {/* Column 3: Features */}
+            <div className="space-y-2.5 text-xs text-slate-300">
+              <h4 className="font-bold text-sm text-white uppercase tracking-wider mb-2">
+                Fitur & Pelaporan Resmi
+              </h4>
+              <ul className="space-y-1.5 text-xs text-slate-300">
+                <li className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                  <span>Pelaporan Excel Resmi dengan Border Lengkap</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                  <span>Format Teks NIK & No. KK Tanpa Scientific Notation</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                  <span>Responsif di HP Android & iPhone (iOS)</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                  <span>Siap Online di Vercel.app & GitHub</span>
+                </li>
+              </ul>
+            </div>
+
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-sky-900/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+            <p>
+              © {new Date().getFullYear()} SAPA St. Maria Magdalena Semampir Kediri.
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Paroki St. Vincentius a Paulo Kota Kediri — Keuskupan Surabaya.
+            </p>
+          </div>
+        </div>
+      </footer>
+
+      {/* Admin Login Modal (Secret Password sapa123 without UI hint) */}
+      <AdminLoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        onSuccess={handleAdminLoginSuccess}
+      />
+
+      {/* Edit Citizen Modal */}
+      <EditWargaModal
+        warga={editingWarga}
+        isOpen={!!editingWarga}
+        onClose={() => setEditingWarga(null)}
+        onSuccess={() => {
+          refreshData();
+          setEditingWarga(null);
+        }}
+      />
+
+      {/* Bukti Registrasi Modal */}
+      <BuktiRegistrasiModal
+        warga={viewingBukti}
+        isOpen={!!viewingBukti}
+        onClose={() => {
+          setViewingBukti(null);
+          setActiveTab('input');
+        }}
+        isAdmin={isAdmin}
+      />
+
+      {/* Security & Encryption Vault Modal (Hanya Akses Admin) */}
+      <EnkripsiSecurityModal
+        isOpen={securityVaultOpen}
+        onClose={() => setSecurityVaultOpen(false)}
+        onDataRestored={() => refreshData()}
+        isAdmin={isAdmin}
+        onOpenLogin={() => setLoginModalOpen(true)}
+      />
+
+    </div>
+  );
+}

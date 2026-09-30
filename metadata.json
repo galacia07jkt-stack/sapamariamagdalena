@@ -1,0 +1,6 @@
+{
+  "name": "SAPA St. Maria Magdalena Semampir Kediri",
+  "description": "Sistem Administrasi dan Pendataan Warga Katolik Lingkungan St. Maria Magdalena Semampir, Paroki St. Vincentius a Paulo Kota Kediri dengan pelaporan Excel berbingkai rapi dan enkripsi data.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
