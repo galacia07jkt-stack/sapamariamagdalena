@@ -7,16 +7,22 @@ interface BuktiRegistrasiModalProps {
   warga: WargaKatolik | null;
   isOpen: boolean;
   onClose: () => void;
-  isAdmin?: boolean;
+  mode?: 'registration' | 'admin';
 }
 
 export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
   warga,
   isOpen,
   onClose,
-  isAdmin = false,
+  mode = 'registration',
 }) => {
   const [showThankYou, setShowThankYou] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setShowThankYou(false);
+    }
+  }, [isOpen, warga?.id]);
 
   if (!isOpen || !warga) return null;
 
@@ -38,6 +44,8 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
     month: 'long',
     year: 'numeric',
   });
+
+  const isRegistrationMode = mode === 'registration';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto print:p-0 print:bg-white">
@@ -105,18 +113,19 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
 
           {/* Tombol Selesai & Kembali ke Form Pendataan Warga */}
           <button
+            type="button"
             onClick={handleDismissAll}
-            className="w-full py-3.5 px-6 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-lg border border-orange-600 flex items-center justify-center gap-2 transition active:scale-98 min-h-[48px]"
+            className="w-full py-3.5 px-6 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-lg border border-orange-600 flex items-center justify-center gap-2 transition active:scale-98 min-h-[48px] cursor-pointer"
           >
             <UserPlus className="w-5 h-5" />
             <span>Kembali ke Form Pendataan Warga</span>
           </button>
         </div>
       ) : (
-        /* SCREEN 2: BUKTI REGISTRASI RESMI JEMAAT KATOLIK */
+        /* SCREEN 2: BUKTI REGISTRASI JEMAAT KATOLIK */
         <div className="bg-white rounded-2xl sm:rounded-3xl border-2 border-orange-500 shadow-2xl max-w-2xl w-full my-auto overflow-hidden print:border-none print:shadow-none print:m-0 print:max-w-none max-h-[92vh] flex flex-col">
           
-          {/* Modal Controls - Hidden during print */}
+          {/* Modal Header Bar */}
           <div className="print:hidden bg-sky-950 text-white p-3.5 sm:p-4 flex items-center justify-between border-b-2 border-orange-500 shrink-0">
             <div className="flex items-center gap-2">
               <SapaLogo size="xs" />
@@ -124,46 +133,51 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
             </div>
             
             <div className="flex items-center gap-2">
-              {/* Button Cetak HANYA muncul untuk akses Admin */}
-              {isAdmin ? (
+              {/* JIKA MODE REGISTRASI: GANTI BUTTON CETAK DENGAN 'SELESAI & KEMBALI KE FORM PENDATAAN WARGA' */}
+              {isRegistrationMode ? (
                 <button
+                  type="button"
+                  onClick={handleFinishAndReturn}
+                  className="px-3 sm:px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs sm:text-sm font-extrabold rounded-xl shadow-md border border-orange-400 flex items-center gap-1.5 transition active:scale-95 min-h-[38px] cursor-pointer"
+                  title="Selesai dan kembali ke form pendataan warga"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+                  <span className="hidden sm:inline">Selesai & Kembali ke Form Pendataan Warga</span>
+                  <span className="sm:hidden">Selesai & Kembali</span>
+                </button>
+              ) : (
+                /* JIKA MODE ADMIN: TAMPILKAN BUTTON CETAK / PDF KHUSUS AKSES ADMIN */
+                <button
+                  type="button"
                   onClick={handlePrint}
-                  className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 transition min-h-[36px]"
-                  title="Cetak Bukti (Khusus Otoritas Admin)"
+                  className="px-3.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 transition min-h-[36px] cursor-pointer"
+                  title="Cetak Bukti (Khusus Akses Admin)"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Cetak / PDF</span>
                 </button>
-              ) : (
-                /* Untuk jemaat / warga: Button Selesai & Kembali ke Form Pendataan */
-                <button
-                  onClick={handleFinishAndReturn}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition min-h-[36px]"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-100" />
-                  <span>Selesai & Kembali</span>
-                </button>
               )}
 
               <button
+                type="button"
                 onClick={() => {
-                  if (!isAdmin) {
+                  if (isRegistrationMode) {
                     handleFinishAndReturn();
                   } else {
                     onClose();
                   }
                 }}
-                className="p-1.5 text-sky-200 hover:text-white rounded-lg hover:bg-white/10 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                className="p-1.5 text-sky-200 hover:text-white rounded-lg hover:bg-white/10 min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          {/* Printable Card Area with Official SAPA Logo */}
+          {/* Printable Certificate Content */}
           <div className="p-4 sm:p-8 bg-white border-4 sm:border-8 border-double border-orange-400 m-2 sm:m-3 rounded-xl sm:rounded-2xl relative overflow-y-auto">
             
-            {/* Letterhead Kop Surat with New Logo */}
+            {/* Letterhead Kop Surat */}
             <div className="text-center pb-3 sm:pb-4 border-b-2 border-sky-950">
               <div className="flex items-center justify-center gap-3 mb-1">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white p-0.5 border border-orange-400 overflow-hidden shrink-0 flex items-center justify-center">
@@ -290,13 +304,13 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
               </div>
             </div>
 
-            {/* Tombol Selesai & Kembali ke Form Pendataan (Khusus Pengguna Biasa / Bukan Admin) */}
-            {!isAdmin && (
+            {/* Tombol Besar Selesai & Kembali ke Form Pendataan di Bagian Bawah Kartu */}
+            {isRegistrationMode && (
               <div className="print:hidden mt-5 pt-4 border-t-2 border-orange-200">
                 <button
                   type="button"
                   onClick={handleFinishAndReturn}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-md border border-orange-600 flex items-center justify-center gap-2 transition active:scale-98 min-h-[46px]"
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-md border border-orange-600 flex items-center justify-center gap-2 transition active:scale-98 min-h-[46px] cursor-pointer"
                 >
                   <CheckCircle2 className="w-5 h-5 text-white" />
                   <span>Selesai & Kembali ke Form Pendataan Warga</span>

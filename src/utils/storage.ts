@@ -11,9 +11,7 @@ const ADMIN_SESSION_KEY = 'SAPA_ADMIN_AUTH_TOKEN';
 const ADMIN_SECRET_HASH = 'sapa123';
 
 /**
- * Mengambil seluruh data jemaat
- * Catatan penting: Jika data dikosongkan/dihapus oleh admin pengurus (panjang array = 0),
- * data akan tetap kosong ([]) dan TIDAK AKAN di-reseed otomatis dengan data demo.
+ * Mengambil data jemaat dari localStorage (cache instan)
  */
 export function getStoredWarga(): WargaKatolik[] {
   try {
@@ -31,8 +29,6 @@ export function getStoredWarga(): WargaKatolik[] {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        // PENTING: Jika parsed adalah [] (kosong karena sudah dihapus/dikosongkan),
-        // TETAP kembalikan [] dan jangan kembalikan INITIAL_WARGA_DATA!
         return parsed.map((item) => ({
           ...item,
           agama: item.agama || 'Katolik',
@@ -40,7 +36,6 @@ export function getStoredWarga(): WargaKatolik[] {
       }
     }
 
-    // Kasus 3: Jika raw bernilai null setelah sebelumnya diinisialisasi
     return [];
   } catch (err) {
     console.error('Error membaca database jemaat:', err);
@@ -62,13 +57,89 @@ export function saveStoredWarga(data: WargaKatolik[]): void {
 }
 
 /**
+ * Sinkronisasi data dengan Server Database Pusat (/api/warga)
+ * Dipanggil secara berkala (real-time polling setiap 3.5 detik) agar:
+ * Saat warga mengisi dari HP / laptop lain, admin langsung melihat data masuk secara real-time!
+ * Melindungi dari kehilangan data jika server sempat restart/fresh.
+ */
+export async function syncWithServer(): Promise<WargaKatolik[]> {
+  try {
+    const localRaw = localStorage.getItem(STORAGE_KEY);
+    const localData: WargaKatolik[] = localRaw ? JSON.parse(localRaw) : [];
+
+    const res = await fetch('/api/warga');
+    if (res.ok) {
+      const json = await res.json();
+      if (json && Array.isArray(json.data)) {
+        const serverData: WargaKatolik[] = json.data;
+
+        // Jika data di server masih kosong tapi di perangkat lokal sudah ada data yang pernah diinput,
+        // sinkronkan data lokal naik ke server agar tidak hilang saat server restart.
+        if (localData.length > 0 && serverData.length === 0) {
+          fetch('/api/warga/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ list: localData }),
+          }).catch(() => {});
+          return localData;
+        }
+
+        // Penggabungan (Merge) data server dan lokal berdasarkan ID unik jemaat
+        const mergedMap = new Map<string, WargaKatolik>();
+        serverData.forEach((item) => mergedMap.set(item.id, item));
+
+        // Jika ada data di lokal yang belum sempat terkirim ke server, pertahankan dan kirim
+        const unpushed: WargaKatolik[] = [];
+        localData.forEach((item) => {
+          if (!mergedMap.has(item.id)) {
+            mergedMap.set(item.id, item);
+            unpushed.push(item);
+          }
+        });
+
+        if (unpushed.length > 0) {
+          unpushed.forEach((item) => {
+            fetch('/api/warga', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(item),
+            }).catch(() => {});
+          });
+        }
+
+        const mergedList = Array.from(mergedMap.values());
+        // Urutkan dari data terbaru
+        mergedList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+        const isDifferent = JSON.stringify(mergedList) !== JSON.stringify(localData);
+        if (isDifferent) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedList));
+          localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
+          window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: mergedList }));
+        }
+        return mergedList;
+      }
+    }
+  } catch (err) {
+    // Jika koneksi terputus atau offline, tetap gunakan cache lokal
+  }
+  return getStoredWarga();
+}
+
+/**
  * Mengosongkan seluruh data jemaat / data demo secara permanen (Otoritas Admin)
+ * Menghapus baik di localStorage maupun di server backend pusat!
  */
 export function kosongkanSemuaWarga(): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
     window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: [] }));
+
+    // Hapus di server pusat
+    fetch('/api/warga', {
+      method: 'DELETE',
+    }).catch((err) => console.error('Gagal hapus database di server:', err));
   } catch (err) {
     console.error('Gagal mengosongkan database:', err);
   }
@@ -82,6 +153,13 @@ export function resetKeDataDemo(): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_WARGA_DATA));
     localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
     window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: INITIAL_WARGA_DATA }));
+
+    // Kirim sinkronisasi ke server
+    fetch('/api/warga/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ list: INITIAL_WARGA_DATA }),
+    }).catch((err) => console.error('Gagal kirim reset demo ke server:', err));
   } catch (err) {
     console.error('Gagal memuat ulang data demo:', err);
   }
@@ -89,6 +167,7 @@ export function resetKeDataDemo(): void {
 
 /**
  * Tambah warga baru (dari formulir mandiri warga atau admin)
+ * Langsung disimpan ke cache lokal DAN dikirim ke server pusat secara real-time!
  */
 export function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdAt' | 'updatedAt'>): WargaKatolik {
   const list = getStoredWarga();
@@ -102,6 +181,21 @@ export function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdAt' | '
 
   const updatedList = [newWarga, ...list];
   saveStoredWarga(updatedList);
+
+  // Kirim secara langsung ke server pusat agar admin dan pengguna lain langsung melihatnya
+  fetch('/api/warga', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newWarga),
+  })
+    .then((res) => res.json())
+    .then((json) => {
+      console.log('[SAPA Sync] Data berhasil tersimpan di server:', json);
+    })
+    .catch((err) => {
+      console.error('[SAPA Sync] Gagal kirim ke server:', err);
+    });
+
   return newWarga;
 }
 
@@ -121,6 +215,14 @@ export function updateWarga(id: string, updatedFields: Partial<WargaKatolik>): W
 
   list[index] = updated;
   saveStoredWarga(list);
+
+  // Kirim pembaruan ke server
+  fetch(`/api/warga/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updated),
+  }).catch((err) => console.error('Gagal update di server:', err));
+
   return updated;
 }
 
@@ -132,6 +234,12 @@ export function hapusWarga(id: string): boolean {
   const filtered = list.filter((w) => w.id !== id);
   if (filtered.length === list.length) return false;
   saveStoredWarga(filtered);
+
+  // Hapus di server
+  fetch(`/api/warga/${id}`, {
+    method: 'DELETE',
+  }).catch((err) => console.error('Gagal hapus di server:', err));
+
   return true;
 }
 
@@ -139,38 +247,37 @@ export function hapusWarga(id: string): boolean {
  * Pencarian data untuk fitur "Cek Ulang Warga"
  * Berdasarkan NIK atau Nomor KK
  */
-export function cariWargaOlehNikAtauKk(keyword: string): WargaKatolik[] {
+export function cariWargaByNikAtauKk(keyword: string): WargaKatolik[] {
   const cleanKeyword = keyword.trim().toLowerCase();
   if (!cleanKeyword) return [];
 
   const list = getStoredWarga();
-  return list.filter((w) => {
-    const matchNik = w.nik.trim().toLowerCase() === cleanKeyword;
-    const matchKk = w.noKk.trim().toLowerCase() === cleanKeyword;
-    const matchNama = cleanKeyword.length >= 4 && (
-      w.namaLengkap.toLowerCase().includes(cleanKeyword) ||
-      w.namaBaptis.toLowerCase().includes(cleanKeyword)
+  return list.filter((warga) => {
+    return (
+      warga.nik.toLowerCase().includes(cleanKeyword) ||
+      warga.noKk.toLowerCase().includes(cleanKeyword) ||
+      warga.namaLengkap.toLowerCase().includes(cleanKeyword) ||
+      warga.namaBaptis.toLowerCase().includes(cleanKeyword)
     );
-    return matchNik || matchKk || matchNama;
   });
 }
 
 /**
- * Hitung statistik agregat jemaat Lingkungan St. Maria Magdalena
+ * Menghitung rekapitulasi statistik demografi jemaat
  */
 export function hitungStatistikParoki(list: WargaKatolik[]): StatistikParoki {
   const totalJiwa = list.length;
   const uniqueKk = new Set(list.map((w) => w.noKk).filter(Boolean));
   const totalKk = uniqueKk.size;
 
-  let totalKatolik = 0;
-  let totalNonKatolik = 0;
   let totalLakiLaki = 0;
   let totalPerempuan = 0;
   let totalBaptis = 0;
   let totalKomuni = 0;
   let totalKrisma = 0;
   let totalNikahKatolik = 0;
+  let totalKatolik = 0;
+  let totalNonKatolik = 0;
 
   const kelompokUsia = {
     biak: 0,
@@ -180,8 +287,8 @@ export function hitungStatistikParoki(list: WargaKatolik[]): StatistikParoki {
     lansia: 0,
   };
 
-  const distribusiRt: { [rt: string]: number } = {};
-  const distribusiAgama: { [agama: string]: number } = {
+  const distribusiRt: Record<string, number> = {};
+  const distribusiAgama: Record<string, number> = {
     Katolik: 0,
     'Kristen Protestan': 0,
     Islam: 0,
@@ -193,133 +300,143 @@ export function hitungStatistikParoki(list: WargaKatolik[]): StatistikParoki {
   const currentYear = new Date().getFullYear();
 
   list.forEach((w) => {
-    // Agama
+    // Hitung Agama
     const agm = w.agama || 'Katolik';
     distribusiAgama[agm] = (distribusiAgama[agm] || 0) + 1;
+
     if (agm === 'Katolik') {
       totalKatolik++;
     } else {
       totalNonKatolik++;
     }
 
+    // Gender
     if (w.jenisKelamin === 'L') totalLakiLaki++;
     if (w.jenisKelamin === 'P') totalPerempuan++;
 
-    if (agm === 'Katolik' && (w.tanggalBaptis || w.namaBaptis)) totalBaptis++;
-    if (agm === 'Katolik' && w.sakramenLain?.komuniPertama) totalKomuni++;
-    if (agm === 'Katolik' && w.sakramenLain?.krisma) totalKrisma++;
+    // Sakramen
+    if (w.noSuratBaptis || w.tanggalBaptis) totalBaptis++;
+    if (w.sakramenLain?.komuniPertama) totalKomuni++;
+    if (w.sakramenLain?.krisma) totalKrisma++;
     if (w.statusPerkawinan === 'Menikah Katolik') totalNikahKatolik++;
 
-    // Hitung usia dari format DD/MM/YYYY atau YYYY-MM-DD
+    // Usia
+    let usia = 30; // default jika tanggal lahir tidak diisi
     if (w.tanggalLahir) {
-      let birthYear = 0;
-      if (w.tanggalLahir.includes('/')) {
-        const parts = w.tanggalLahir.split('/');
-        birthYear = parseInt(parts[2], 10);
-      } else if (w.tanggalLahir.includes('-')) {
-        const parts = w.tanggalLahir.split('-');
-        birthYear = parseInt(parts[0], 10);
+      const birthYear = parseInt(w.tanggalLahir.split('-')[0] || w.tanggalLahir.split('/')[2] || '1995', 10);
+      if (!isNaN(birthYear)) {
+        usia = Math.max(0, currentYear - birthYear);
       }
-
-      if (!isNaN(birthYear) && birthYear > 1900) {
-        const age = currentYear - birthYear;
-        if (age <= 12) kelompokUsia.biak++;
-        else if (age <= 17) kelompokUsia.rekat++;
-        else if (age <= 35) kelompokUsia.omk++;
-        else if (age <= 59) kelompokUsia.dewasa++;
-        else kelompokUsia.lansia++;
-      } else {
-        kelompokUsia.dewasa++;
-      }
-    } else {
-      kelompokUsia.dewasa++;
     }
 
+    if (usia <= 12) kelompokUsia.biak++;
+    else if (usia <= 17) kelompokUsia.rekat++;
+    else if (usia <= 35) kelompokUsia.omk++;
+    else if (usia <= 59) kelompokUsia.dewasa++;
+    else kelompokUsia.lansia++;
+
     // Distribusi RT
-    const rtKey = w.rtRw ? w.rtRw.split('/')[0].trim() : 'Lainnya';
-    distribusiRt[rtKey] = (distribusiRt[rtKey] || 0) + 1;
+    const rt = w.rtRw || 'RT Belum Terdata';
+    distribusiRt[rt] = (distribusiRt[rt] || 0) + 1;
   });
 
   return {
     totalJiwa,
     totalKk,
-    totalKatolik,
-    totalNonKatolik,
     totalLakiLaki,
     totalPerempuan,
     totalBaptis,
     totalKomuni,
     totalKrisma,
     totalNikahKatolik,
+    totalKatolik,
+    totalNonKatolik,
     kelompokUsia,
     distribusiRt,
     distribusiAgama,
   };
 }
 
-/**
- * Autentikasi Admin
- * Password strictly 'sapa123'
- */
-export function verifikasiAdminPassword(inputPassword: string): boolean {
-  if (inputPassword === ADMIN_SECRET_HASH) {
-    const sessionToken = `AUTH_SAPA_ADMIN_${Date.now()}`;
-    sessionStorage.setItem(ADMIN_SESSION_KEY, sessionToken);
+// ==========================================
+// KELOLA AUTENTIKASI ADMIN & ENKRIPSI VAULT
+// ==========================================
+
+export function authenticateAdmin(passwordInput: string): boolean {
+  if (passwordInput === ADMIN_SECRET_HASH) {
+    sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
+    window.dispatchEvent(new CustomEvent('sapa-auth-changed', { detail: true }));
     return true;
   }
   return false;
 }
 
 export function isAdminAuthenticated(): boolean {
-  return !!sessionStorage.getItem(ADMIN_SESSION_KEY);
+  return sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true';
 }
 
 export function logoutAdmin(): void {
   sessionStorage.removeItem(ADMIN_SESSION_KEY);
-  window.dispatchEvent(new CustomEvent('sapa-auth-changed'));
+  window.dispatchEvent(new CustomEvent('sapa-auth-changed', { detail: false }));
 }
 
 /**
- * Fitur Enkripsi Backup Data Paroki
+ * Unduh backup arsip terenkripsi (.sapa) menggunakan AES-GCM 256
  */
-export async function buatBackupTerenkripsi(): Promise<string> {
-  const list = getStoredWarga();
-  const jsonStr = JSON.stringify(list, null, 2);
-  const encrypted = await encryptData(jsonStr);
+export async function downloadEncryptedVault(passkey: string = 'sapa123-semampir-kediri-secure'): Promise<string> {
+  const currentData = getStoredWarga();
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    paroki: 'St. Vincentius a Paulo Kediri',
+    lingkungan: 'St. Maria Magdalena - Semampir',
+    totalRecords: currentData.length,
+    data: currentData,
+  };
+  const jsonStr = JSON.stringify(payload);
+  const encrypted = await encryptData(jsonStr, passkey);
   localStorage.setItem(ENCRYPTED_BACKUP_KEY, encrypted);
-  return encrypted;
-}
 
-/**
- * Unduh file cadangan terenkripsi (.sapa-vault)
- */
-export async function downloadEncryptedVault(): Promise<void> {
-  const encrypted = await buatBackupTerenkripsi();
-  const blob = new Blob([encrypted], { type: 'application/json' });
+  // Trigger file download otomatis
+  const blob = new Blob([encrypted], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `SAPA_ENCRYPTED_VAULT_${new Date().toISOString().slice(0, 10)}.sapa`;
+  a.download = `SAPA_BACKUP_VAULT_${new Date().toISOString().slice(0, 10)}.sapa`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+
+  return encrypted;
 }
 
 /**
- * Pulihkan data dari file cadangan terenkripsi
+ * Pulihkan data dari string arsip terenkripsi (.sapa)
  */
-export async function restoreFromEncryptedVault(fileContent: string): Promise<boolean> {
+export async function restoreFromEncryptedVault(encryptedStr: string, passkey: string = 'sapa123-semampir-kediri-secure'): Promise<boolean> {
   try {
-    const decrypted = await decryptData(fileContent);
-    const parsed = JSON.parse(decrypted);
-    if (Array.isArray(parsed)) {
-      saveStoredWarga(parsed);
+    const decryptedJson = await decryptData(encryptedStr, passkey);
+    if (!decryptedJson) return false;
+
+    const payload = JSON.parse(decryptedJson);
+    if (payload && Array.isArray(payload.data)) {
+      saveStoredWarga(payload.data);
+      // Kirim sinkronisasi ke server juga
+      fetch('/api/warga/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ list: payload.data }),
+      }).catch((err) => console.error('Gagal sync restore ke server:', err));
       return true;
     }
     return false;
-  } catch (err) {
-    console.error('Gagal restore data:', err);
+  } catch {
     return false;
   }
 }
+
+// Export aliases untuk kompatibilitas komponen
+export const cariWargaOlehNikAtauKk = cariWargaByNikAtauKk;
+export const verifikasiAdminPassword = authenticateAdmin;
+export const exportEncryptedBackup = downloadEncryptedVault;
+export const restoreEncryptedBackup = restoreFromEncryptedVault;
+

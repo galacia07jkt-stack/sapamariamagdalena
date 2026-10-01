@@ -70,17 +70,17 @@ export const CekUlangWarga: React.FC<CekUlangWargaProps> = ({
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 placeholder="Ketik NIK, No. KK, atau Nama Warga..."
-                className="w-full pl-10 pr-4 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-base sm:text-sm font-medium bg-slate-50 focus:bg-white min-h-[48px]"
+                className="w-full pl-11 pr-4 py-3.5 sm:py-4 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all text-base sm:text-lg font-bold text-slate-900 bg-slate-50 focus:bg-white min-h-[52px] sm:min-h-[56px]"
               />
-              <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5 sm:top-4" />
+              <Search className="w-5 h-5 text-slate-400 absolute left-4 top-4 sm:top-4.5" />
             </div>
 
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="flex-1 sm:flex-none px-6 py-3 sm:py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-sm rounded-xl sm:rounded-2xl shadow-md active:scale-98 transition-all flex items-center justify-center gap-2 border border-orange-600 shrink-0 min-h-[48px]"
+                className="flex-1 sm:flex-none px-7 py-3.5 sm:py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-base rounded-2xl shadow-md active:scale-98 transition-all flex items-center justify-center gap-2 border-2 border-orange-600 shrink-0 min-h-[52px] sm:min-h-[56px] cursor-pointer"
               >
-                <Search className="w-4 h-4" />
+                <Search className="w-5 h-5" />
                 <span>Cari Data</span>
               </button>
 
@@ -88,14 +88,14 @@ export const CekUlangWarga: React.FC<CekUlangWargaProps> = ({
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="px-4 py-3 sm:py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl sm:rounded-2xl transition shrink-0 min-h-[48px]"
+                  className="px-5 py-3.5 sm:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-base rounded-2xl transition shrink-0 min-h-[52px] sm:min-h-[56px] cursor-pointer"
                 >
                   Reset
                 </button>
               )}
             </div>
           </div>
-          <p className="text-[10px] sm:text-xs text-slate-400 mt-2">
+          <p className="text-xs sm:text-sm text-slate-600 mt-2 font-medium">
             💡 Masukkan 16 digit NIK atau Nomor Kartu Keluarga (KK) untuk melihat anggota keluarga yang sudah terdaftar.
           </p>
         </form>

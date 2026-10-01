@@ -8,12 +8,14 @@ import {
   ShieldCheck, 
   Check, 
   Calendar,
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WargaKatolik, AgamaType } from '../types';
 import { tambahWarga } from '../utils/storage';
 import { formatInputToDdMmYyyy, isValidDdMmYyyy } from '../utils/dateUtils';
-import { toTitleCase, formatRealtimeTitleCase, formatRtRw } from '../utils/textUtils';
+import { toTitleCase, formatRealtimeTitleCase } from '../utils/textUtils';
 
 interface FormInputWargaProps {
   onSuccess: (newWarga: WargaKatolik) => void;
@@ -63,32 +65,28 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
 
   const isKatolik = formData.agama === 'Katolik';
 
-  // Handle general change with Title Case format: Huruf pertama di setiap kata wajib KAPITAL/BESAR
+  // Format Title Case & sanitasi input
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     if (type === 'checkbox') {
       const { checked } = e.target as HTMLInputElement;
       setFormData((prev) => ({ ...prev, [name]: checked }));
     } else if (name === 'tanggalLahir' || name === 'tanggalBaptis') {
-      // Auto format DD/MM/YYYY
       const formatted = formatInputToDdMmYyyy(value);
       setFormData((prev) => ({ ...prev, [name]: formatted }));
     } else if (name === 'noKk' || name === 'nik' || name === 'noHpWhatsapp') {
       setFormData((prev) => ({ ...prev, [name]: value }));
     } else if (name === 'rt' || name === 'rw') {
-      // Inputan RT sendiri & RW sendiri (bukan dropdown, hanya alfanumerik angka/huruf)
       const cleanVal = value.replace(/[^0-9a-zA-Z]/g, '').slice(0, 4);
       setFormData((prev) => ({ ...prev, [name]: cleanVal }));
     } else if (name === 'agama' || name === 'jenisKelamin' || name === 'hubunganKeluarga' || name === 'statusPerkawinan') {
       setFormData((prev) => ({ ...prev, [name]: value }));
     } else {
-      // Format Title Case secara realtime
       const formattedValue = formatRealtimeTitleCase(value);
       setFormData((prev) => ({ ...prev, [name]: formattedValue }));
     }
   };
 
-  // Blur handler to ensure full Title Case perfection on unfocus
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (
@@ -114,7 +112,6 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
     e.preventDefault();
     setErrorMsg(null);
 
-    // Sanitize input
     const cleanKk = formData.noKk.replace(/\D/g, '');
     const cleanNik = formData.nik.replace(/\D/g, '');
 
@@ -158,17 +155,13 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
       return;
     }
 
-    if (!formData.alamatDomisili.trim()) {
-      setErrorMsg('Alamat domisili di Semampir Kota Kediri wajib diisi.');
-      return;
-    }
-
     setSubmitting(true);
 
     try {
-      const finalRtRw = formatRtRw(formData.rt, formData.rw);
+      const padRt = formData.rt.padStart(2, '0');
+      const padRw = formData.rw.padStart(2, '0');
+      const finalRtRw = `RT ${padRt} / RW ${padRw}`;
 
-      // Data disimpan dalam format Title Case: Huruf pertama di setiap kata wajib KAPITAL/BESAR
       const created = tambahWarga({
         noKk: cleanKk,
         nik: cleanNik,
@@ -198,7 +191,6 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
         catatanKhusus: toTitleCase(formData.catatanKhusus.trim()),
       });
 
-      // Confetti celebratory burst
       try {
         confetti({
           particleCount: 80,
@@ -213,7 +205,6 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
       setSuccessWarga(created);
       onSuccess(created);
 
-      // Keep family data for next entry (termasuk RT dan RW tetap dipertahankan)
       if (keepFamilyData) {
         setFormData((prev) => ({
           ...prev,
@@ -264,13 +255,13 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Form Container with Orange Border and Mobile-Ready Layout */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border-2 border-orange-500 shadow-md overflow-hidden">
+      {/* Form Container with High-Contrast Border and Mobile-First Alignment */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl border-2 border-orange-500 shadow-xl overflow-hidden">
         
-        {/* Form Title Header with Official SAPA Logo */}
-        <div className="bg-gradient-to-r from-sky-800 via-sky-700 to-sky-900 text-white p-4 sm:p-7 border-b-4 border-orange-500">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white p-0.5 shadow-md border-2 border-orange-400 shrink-0 overflow-hidden flex items-center justify-center">
+        {/* Header Banner */}
+        <div className="bg-gradient-to-r from-sky-950 via-sky-900 to-sky-950 text-white p-4 sm:p-7 border-b-4 border-orange-500">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-white p-1 shadow-md border-2 border-orange-400 shrink-0 overflow-hidden flex items-center justify-center">
               <img
                 src="/logo-sapa.png"
                 alt="Logo SAPA"
@@ -278,46 +269,41 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
               />
             </div>
             <div>
-              <h2 className="text-base sm:text-2xl font-extrabold tracking-tight leading-snug">
+              <h2 className="text-lg sm:text-2xl font-black tracking-tight leading-snug">
                 Formulir Pendataan Warga
               </h2>
-              <p className="text-[11px] sm:text-xs text-sky-200 mt-0.5 line-clamp-1">
-                Lingkungan St. Maria Magdalena Semampir Kediri • Input RT & RW Mandiri • Title Case & DD/MM/YYYY
+              <p className="text-xs sm:text-sm text-sky-200 mt-0.5 font-medium">
+                Lingkungan St. Maria Magdalena Semampir Kediri
               </p>
+              <div className="mt-2 inline-flex items-center gap-1.5 bg-orange-500/30 border border-orange-400/60 px-2.5 py-0.5 rounded-lg text-xs font-bold text-orange-200">
+                <Sparkles className="w-3.5 h-3.5 text-orange-300" />
+                <span>Tampilan Ramah Lansia • Huruf Jelas & Tertata Rapi</span>
+              </div>
             </div>
-          </div>
-          
-          {/* Format Notice Pill */}
-          <div className="mt-3 inline-flex items-center gap-2 bg-sky-950/60 border border-sky-400/40 px-3 py-1 rounded-lg text-[11px] text-sky-100">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Format Otomatis: <strong>Title Case</strong>, Tanggal <strong>DD/MM/YYYY</strong>, Input <strong>RT & RW Mandiri</strong></span>
           </div>
         </div>
 
         {/* Success Alert Banner */}
         {successWarga && (
-          <div className="m-3 sm:m-6 p-4 sm:p-5 bg-emerald-50 border-2 border-emerald-500 rounded-xl sm:rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in">
+          <div className="m-3 sm:m-6 p-4 sm:p-5 bg-emerald-50 border-2 border-emerald-500 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-fade-in">
             <div className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 shrink-0 mt-0.5" />
+              <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-bold text-emerald-950 text-sm sm:text-base">
+                <h4 className="font-extrabold text-emerald-950 text-sm sm:text-base">
                   Data Warga Berhasil Terdaftar!
                 </h4>
-                <p className="text-xs sm:text-sm text-emerald-800 mt-0.5">
-                  Atas nama <strong>{successWarga.namaBaptis ? `${successWarga.namaBaptis} ` : ''}{successWarga.namaLengkap}</strong> ({successWarga.agama}) telah tercatat dalam sistem SAPA Paroki.
+                <p className="text-xs sm:text-sm text-emerald-800 mt-1">
+                  Atas nama <strong>{successWarga.namaBaptis ? `${successWarga.namaBaptis} ` : ''}{successWarga.namaLengkap}</strong> ({successWarga.agama}) telah tersimpan di database pusat.
                 </p>
-                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-mono text-emerald-800">
-                  <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-300">
+                <div className="mt-2 flex flex-wrap gap-2 text-xs font-mono font-bold text-emerald-900">
+                  <span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-300">
                     NIK: {successWarga.nik}
                   </span>
-                  <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-300">
+                  <span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-300">
                     No. KK: {successWarga.noKk}
                   </span>
-                  <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-300 font-bold">
+                  <span className="bg-white px-2.5 py-1 rounded-lg border border-emerald-300">
                     {successWarga.rtRw}
-                  </span>
-                  <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-300 font-bold">
-                    Agama: {successWarga.agama}
                   </span>
                 </div>
               </div>
@@ -325,38 +311,51 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
             <button
               type="button"
               onClick={() => setSuccessWarga(null)}
-              className="text-xs px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold self-end sm:self-center min-h-[36px]"
+              className="text-xs sm:text-sm px-4 py-2 bg-emerald-700 text-white rounded-xl hover:bg-emerald-800 font-bold self-end sm:self-center min-h-[40px] cursor-pointer"
             >
-              Tutup
+              Tutup Pesan
             </button>
           </div>
         )}
 
         {/* Error Alert Banner */}
         {errorMsg && (
-          <div className="mx-3 sm:mx-6 mt-4 p-3.5 bg-rose-50 border-2 border-rose-400 rounded-xl flex items-center gap-2.5 text-rose-800 text-xs sm:text-sm">
-            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-            <p className="font-semibold">{errorMsg}</p>
+          <div className="mx-3 sm:mx-6 mt-4 p-4 bg-rose-50 border-2 border-rose-500 rounded-2xl flex items-center gap-3 text-rose-900 text-sm sm:text-base font-bold shadow-xs">
+            <AlertCircle className="w-6 h-6 text-rose-600 shrink-0" />
+            <p>{errorMsg}</p>
           </div>
         )}
 
-        {/* Responsive Input Form */}
-        <form onSubmit={handleSubmit} className="p-3.5 sm:p-8 space-y-6 sm:space-y-8">
+        {/* Form Isi Data: Layout Rapi, Vertikal Teratur, Tanpa Naik Turun */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-8 space-y-7 sm:space-y-9">
           
-          {/* SECTION 1: DATA IDENTITAS, AGAMA & KEPENDUDUKAN */}
-          <div>
-            <div className="flex items-center gap-2 pb-2 border-b-2 border-orange-400 text-sky-950 font-bold text-sm sm:text-base mb-3 sm:mb-4">
-              <span className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-extrabold shrink-0">
+          {/* ========================================================
+              SECTION 1: DATA IDENTITAS, AGAMA & KEPENDUDUKAN
+             ======================================================== */}
+          <div className="space-y-5">
+            {/* Section Header */}
+            <div className="bg-sky-900 text-white p-3.5 sm:p-4 rounded-2xl flex items-center gap-3 border-l-6 border-orange-500 shadow-xs">
+              <span className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-sm">
                 1
               </span>
-              <span>Data Identitas, Agama & Kependudukan (Title Case)</span>
+              <div>
+                <h3 className="text-sm sm:text-base font-extrabold uppercase tracking-wide">
+                  Data Identitas, Agama & Kependudukan
+                </h3>
+                <p className="text-xs text-sky-200 mt-0.5">
+                  Isikan nomor identitas resmi dan data pribadi jemaat.
+                </p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-5">
+            {/* Form Fields: Grid 1 Kolom di HP, 2 Kolom di Desktop (Tertata Rapi) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+              
               {/* No. KK */}
-              <div>
-                <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Nomor Kartu Keluarga (No. KK) <span className="text-rose-500">*</span>
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5 flex items-center justify-between">
+                  <span>Nomor Kartu Keluarga (No. KK) <span className="text-rose-600 font-black">*</span></span>
+                  <span className="text-xs text-slate-500 font-normal">Wajib 16 digit</span>
                 </label>
                 <input
                   type="text"
@@ -366,17 +365,20 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   value={formData.noKk}
                   onChange={handleChange}
                   maxLength={16}
-                  placeholder="357102xxxxxxxxxx (16 digit)"
-                  className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all font-mono text-base sm:text-sm bg-white min-h-[44px]"
+                  placeholder="Contoh: 3571020101900001"
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 transition-all font-mono font-bold text-base sm:text-lg text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                   required
                 />
-                <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1">16 digit angka sesuai Kartu Keluarga resmi.</p>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                  16 angka sesuai lembar Kartu Keluarga resmi.
+                </p>
               </div>
 
               {/* NIK */}
-              <div>
-                <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Nomor Induk Kependudukan (NIK) <span className="text-rose-500">*</span>
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5 flex items-center justify-between">
+                  <span>Nomor Induk Kependudukan (NIK) <span className="text-rose-600 font-black">*</span></span>
+                  <span className="text-xs text-slate-500 font-normal">Wajib 16 digit</span>
                 </label>
                 <input
                   type="text"
@@ -386,18 +388,20 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   value={formData.nik}
                   onChange={handleChange}
                   maxLength={16}
-                  placeholder="357102xxxxxxxxxx (16 digit)"
-                  className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all font-mono text-base sm:text-sm bg-white min-h-[44px]"
+                  placeholder="Contoh: 3571021508950002"
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 transition-all font-mono font-bold text-base sm:text-lg text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                   required
                 />
-                <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1">16 digit NIK warga yang didaftarkan.</p>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                  16 angka NIK KTP warga yang didaftarkan.
+                </p>
               </div>
 
-              {/* Nama Lengkap (Title Case) */}
-              <div>
-                <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Nama Lengkap Sesuai KTP <span className="text-rose-500">*</span>
-                  <span className="text-[10px] text-orange-600 font-semibold normal-case ml-1">(Title Case)</span>
+              {/* Nama Lengkap (Full Width) */}
+              <div className="flex flex-col md:col-span-2">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5 flex items-center justify-between">
+                  <span>Nama Lengkap Sesuai KTP <span className="text-rose-600 font-black">*</span></span>
+                  <span className="text-xs text-orange-700 font-bold bg-orange-100 px-2 py-0.5 rounded">Huruf Awal Kapital Otomatis</span>
                 </label>
                 <input
                   type="text"
@@ -405,164 +409,197 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   value={formData.namaLengkap}
                   onChange={handleChange}
                   onBlur={handleBlur}
-                  placeholder="Contoh: Bambang Trianto"
-                  className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition-all text-base sm:text-sm bg-white min-h-[44px] font-semibold text-slate-900"
+                  placeholder="Contoh: Yohanes Stefanus Bambang Santoso"
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 transition-all text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                   required
                 />
+                <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                  Nama lengkap warga resmi (tanpa disingkat jika memungkinkan).
+                </p>
               </div>
 
-              {/* KOLOM AGAMA (Katolik, Kristen Protestan, Islam, Hindu, Buddha, Kepercayaan) */}
-              <div>
-                <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Agama <span className="text-rose-500">*</span>
+              {/* Agama (Katolik / Non-Katolik) */}
+              <div className="flex flex-col md:col-span-2">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
+                  Agama Jemaat / Warga <span className="text-rose-600 font-black">*</span>
                 </label>
-                <div className="relative">
-                  <select
-                    name="agama"
-                    value={formData.agama}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border-2 border-orange-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 text-base sm:text-sm bg-orange-50/30 font-bold text-orange-950 min-h-[44px]"
-                  >
-                    {agamaList.map((agm) => (
-                      <option key={agm} value={agm}>
-                        {agm}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1">
+                <select
+                  name="agama"
+                  value={formData.agama}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-orange-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg bg-orange-50/40 font-black text-sky-950 min-h-[52px] sm:min-h-[56px] shadow-2xs cursor-pointer"
+                >
+                  {agamaList.map((agm) => (
+                    <option key={agm} value={agm}>
+                      {agm === 'Katolik' ? '✝️ Katolik (Data Sakramen Baptis Ditampilkan)' : agm}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
                   {isKatolik 
-                    ? '✨ Warga Katolik: Bagian sakramen baptis & kategorial akan ditampilkan.' 
+                    ? '✝️ Warga Katolik: Bagian data Sakramen Baptis, Komuni, & Krisma akan dibuka di bawah.' 
                     : 'ℹ️ Non-Katolik: Bagian sakramen gerejawi Katolik dilewati secara otomatis.'}
                 </p>
               </div>
 
-              {/* Jenis Kelamin & Hubungan Keluarga */}
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Jenis Kelamin <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    name="jenisKelamin"
-                    value={formData.jenisKelamin}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
+              {/* Jenis Kelamin (Tombol Pilihan Besar Ramah Lansia) */}
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
+                  Jenis Kelamin <span className="text-rose-600 font-black">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, jenisKelamin: 'L' }))}
+                    className={`py-3.5 px-3 rounded-2xl border-2 font-black text-sm sm:text-base flex items-center justify-center gap-2 transition min-h-[52px] cursor-pointer ${
+                      formData.jenisKelamin === 'L'
+                        ? 'bg-sky-900 border-sky-950 text-white shadow-md'
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
                   >
-                    <option value="L">Laki-Laki (L)</option>
-                    <option value="P">Perempuan (P)</option>
-                  </select>
-                </div>
+                    <span>👨 Laki-Laki (L)</span>
+                  </button>
 
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Hub. Keluarga
-                  </label>
-                  <select
-                    name="hubunganKeluarga"
-                    value={formData.hubunganKeluarga}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, jenisKelamin: 'P' }))}
+                    className={`py-3.5 px-3 rounded-2xl border-2 font-black text-sm sm:text-base flex items-center justify-center gap-2 transition min-h-[52px] cursor-pointer ${
+                      formData.jenisKelamin === 'P'
+                        ? 'bg-orange-600 border-orange-700 text-white shadow-md'
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
                   >
-                    <option value="Kepala Keluarga">Kepala Keluarga</option>
-                    <option value="Istri">Istri</option>
-                    <option value="Anak">Anak</option>
-                    <option value="Orang Tua">Orang Tua</option>
-                    <option value="Famili Lain">Famili Lain</option>
-                  </select>
+                    <span>👩 Perempuan (P)</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Tempat & Tanggal Lahir (Format DD/MM/YYYY) */}
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Tempat Lahir
-                  </label>
+              {/* Hubungan Keluarga */}
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
+                  Hubungan Dalam Keluarga <span className="text-rose-600 font-black">*</span>
+                </label>
+                <select
+                  name="hubunganKeluarga"
+                  value={formData.hubunganKeluarga}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs cursor-pointer"
+                >
+                  <option value="Kepala Keluarga">Kepala Keluarga</option>
+                  <option value="Istri">Istri</option>
+                  <option value="Anak">Anak</option>
+                  <option value="Orang Tua">Orang Tua</option>
+                  <option value="Famili Lain">Famili Lain</option>
+                </select>
+              </div>
+
+              {/* Tempat Lahir */}
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
+                  Kota / Tempat Lahir
+                </label>
+                <input
+                  type="text"
+                  name="tempatLahir"
+                  value={formData.tempatLahir}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  placeholder="Contoh: Kediri"
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
+                />
+              </div>
+
+              {/* Tanggal Lahir (DD/MM/YYYY) */}
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5 flex items-center justify-between">
+                  <span>Tanggal Lahir (DD/MM/YYYY)</span>
+                  <span className="text-xs text-slate-500 font-mono">Format: HH/BB/TTTT</span>
+                </label>
+                <div className="relative">
                   <input
                     type="text"
-                    name="tempatLahir"
-                    value={formData.tempatLahir}
+                    name="tanggalLahir"
+                    inputMode="numeric"
+                    value={formData.tanggalLahir}
                     onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="Contoh: Kediri"
-                    className="w-full px-3 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
+                    maxLength={10}
+                    placeholder="Contoh: 15/08/1995"
+                    className="w-full pl-4 pr-11 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-mono font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                   />
+                  <Calendar className="w-5 h-5 text-slate-400 absolute right-3.5 top-4 pointer-events-none" />
                 </div>
-
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Tanggal Lahir (DD/MM/YYYY)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      name="tanggalLahir"
-                      inputMode="numeric"
-                      value={formData.tanggalLahir}
-                      onChange={handleChange}
-                      maxLength={10}
-                      placeholder="HH/BB/TTTT (15/08/1995)"
-                      className="w-full pl-3 pr-8 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white font-mono min-h-[44px]"
-                    />
-                    <Calendar className="w-4 h-4 text-slate-400 absolute right-2.5 top-3.5 sm:top-3 pointer-events-none" />
-                  </div>
-                </div>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                  Contoh penulisan: 15/08/1995 (hari / bulan / tahun).
+                </p>
               </div>
 
-              {/* Status Perkawinan & No WhatsApp */}
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Status Pernikahan
-                  </label>
-                  <select
-                    name="statusPerkawinan"
-                    value={formData.statusPerkawinan}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
-                  >
-                    <option value="Belum Menikah">Belum Menikah</option>
-                    <option value="Menikah Katolik">Menikah Katolik</option>
-                    <option value="Menikah Campur">Menikah Campur</option>
-                    <option value="Janda/Duda">Janda / Duda</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    No. WhatsApp / HP
-                  </label>
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    name="noHpWhatsapp"
-                    value={formData.noHpWhatsapp}
-                    onChange={handleChange}
-                    placeholder="081234xxxx"
-                    className="w-full px-3 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white font-mono min-h-[44px]"
-                  />
-                </div>
+              {/* Status Pernikahan */}
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
+                  Status Pernikahan
+                </label>
+                <select
+                  name="statusPerkawinan"
+                  value={formData.statusPerkawinan}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs cursor-pointer"
+                >
+                  <option value="Belum Menikah">Belum Menikah</option>
+                  <option value="Menikah Katolik">Menikah Katolik</option>
+                  <option value="Menikah Campur">Menikah Campur</option>
+                  <option value="Janda/Duda">Janda / Duda</option>
+                </select>
               </div>
+
+              {/* No. WhatsApp / HP */}
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
+                  Nomor WhatsApp / HP
+                </label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  name="noHpWhatsapp"
+                  value={formData.noHpWhatsapp}
+                  onChange={handleChange}
+                  placeholder="Contoh: 081234567890"
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-mono font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
+                />
+                <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                  Digunakan untuk informasi kegiatan lingkungan & doa.
+                </p>
+              </div>
+
             </div>
           </div>
 
-          {/* SECTION 2: DATA SAKRAMEN BAPTIS KATOLIK (HANYA MUNCUL JIKA AGAMA KATOLIK) */}
+          {/* ========================================================
+              SECTION 2: DATA SAKRAMEN BAPTIS KATOLIK (KHUSUS KATOLIK)
+             ======================================================== */}
           {isKatolik ? (
-            <div className="animate-fade-in">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-orange-400 text-sky-950 font-bold text-sm sm:text-base mb-3 sm:mb-4">
-                <span className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-extrabold shrink-0">
+            <div className="space-y-5 animate-fade-in pt-3 border-t-2 border-slate-200">
+              {/* Section Header */}
+              <div className="bg-sky-900 text-white p-3.5 sm:p-4 rounded-2xl flex items-center gap-3 border-l-6 border-orange-500 shadow-xs">
+                <span className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-sm">
                   2
                 </span>
-                <span>Data Sakramen Baptis Katolik (Format Title Case & Tanggal DD/MM/YYYY)</span>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold uppercase tracking-wide">
+                    Data Sakramen Baptis Katolik
+                  </h3>
+                  <p className="text-xs text-sky-200 mt-0.5">
+                    Informasi buku permandian, Santo/Santa pelindung, dan sakramen gereja.
+                  </p>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-5">
-                {/* Nama Baptis */}
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Nama Baptis (Santo / Santa Pelindung) <span className="text-rose-500">*</span>
-                    <span className="text-[10px] text-orange-600 font-semibold normal-case ml-1">(Title Case)</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                
+                {/* Nama Baptis (Full Width) */}
+                <div className="flex flex-col md:col-span-2">
+                  <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5 flex items-center justify-between">
+                    <span>Nama Baptis (Santo / Santa Pelindung) <span className="text-rose-600 font-black">*</span></span>
+                    <span className="text-xs text-orange-700 font-bold bg-orange-100 px-2 py-0.5 rounded">Huruf Awal Kapital</span>
                   </label>
                   <input
                     type="text"
@@ -571,15 +608,17 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                     onChange={handleChange}
                     onBlur={handleBlur}
                     placeholder="Contoh: Fransiskus Xaverius / Maria Magdalena"
-                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border-2 border-orange-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all text-base sm:text-sm bg-orange-50/20 font-bold text-orange-950 min-h-[44px]"
+                    className="w-full px-4 py-3.5 rounded-2xl border-2 border-orange-400 focus:border-orange-500 focus:bg-orange-50/20 focus:ring-4 focus:ring-orange-100 transition-all text-base sm:text-lg font-black text-sky-950 bg-orange-50/20 min-h-[52px] sm:min-h-[56px] shadow-2xs"
                     required={isKatolik}
                   />
-                  <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1">Nama Santo / Santa yang diterima saat pembaptisan.</p>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                    Nama Santo / Santa pelindung yang diterima saat pembaptisan.
+                  </p>
                 </div>
 
-                {/* No. Surat / Akta Baptis */}
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                {/* Nomor Surat / Akta Baptis */}
+                <div className="flex flex-col">
+                  <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
                     Nomor Surat / Akta Baptis (Buku Permandian)
                   </label>
                   <div className="relative">
@@ -589,49 +628,20 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                       value={formData.noSuratBaptis}
                       onChange={handleChange}
                       placeholder="Contoh: SVP-KDR/B/1982/0142"
-                      className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition-all font-mono text-base sm:text-sm bg-white min-h-[44px]"
+                      className="w-full pl-4 pr-11 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 transition-all font-mono font-bold text-base sm:text-lg text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                     />
-                    <FileBadge className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 sm:top-3" />
+                    <FileBadge className="w-5 h-5 text-slate-400 absolute right-3.5 top-4 pointer-events-none" />
                   </div>
-                  <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1">Nomor register pada buku baptis paroki.</p>
-                </div>
-
-                {/* Tempat Baptis */}
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Tempat Pembaptisan / Gereja
-                  </label>
-                  <input
-                    type="text"
-                    name="tempatBaptis"
-                    value={formData.tempatBaptis}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="Contoh: Gereja Katolik St. Vincentius A Paulo"
-                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
-                  />
-                </div>
-
-                {/* Paroki / Kota Baptis */}
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Paroki / Kota Baptis
-                  </label>
-                  <input
-                    type="text"
-                    name="parokiKotaBaptis"
-                    value={formData.parokiKotaBaptis}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="Contoh: Paroki St. Vincentius A Paulo - Kota Kediri"
-                    className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
-                  />
+                  <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                    Tercantum pada surat baptis (jika ada).
+                  </p>
                 </div>
 
                 {/* Tanggal Baptis (DD/MM/YYYY) */}
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Tanggal Baptis (DD/MM/YYYY)
+                <div className="flex flex-col">
+                  <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5 flex items-center justify-between">
+                    <span>Tanggal Baptis (DD/MM/YYYY)</span>
+                    <span className="text-xs text-slate-500 font-mono">Format: HH/BB/TTTT</span>
                   </label>
                   <div className="relative">
                     <input
@@ -641,84 +651,156 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                       value={formData.tanggalBaptis}
                       onChange={handleChange}
                       maxLength={10}
-                      placeholder="HH/BB/TTTT (22/08/1995)"
-                      className="w-full pl-3 pr-8 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white font-mono min-h-[44px]"
+                      placeholder="Contoh: 22/08/1995"
+                      className="w-full pl-4 pr-11 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-mono font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                     />
-                    <Calendar className="w-4 h-4 text-slate-400 absolute right-2.5 top-3.5 sm:top-3 pointer-events-none" />
+                    <Calendar className="w-5 h-5 text-slate-400 absolute right-3.5 top-4 pointer-events-none" />
                   </div>
-                  <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1">Format tanggal Indonesia DD/MM/YYYY.</p>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                    Format penulisan DD/MM/YYYY (contoh: 22/08/1995).
+                  </p>
                 </div>
 
-                {/* Penerimaan Sakramen Katolik Lainnya */}
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Sakramen Katolik Lainnya Yang Diterima
+                {/* Tempat Baptis / Nama Gereja */}
+                <div className="flex flex-col">
+                  <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
+                    Tempat Pembaptisan / Nama Gereja
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    name="tempatBaptis"
+                    value={formData.tempatBaptis}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="Contoh: Gereja Katolik St. Vincentius A Paulo"
+                    className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
+                  />
+                </div>
+
+                {/* Paroki / Kota Baptis */}
+                <div className="flex flex-col">
+                  <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
+                    Paroki & Kota Tempat Baptis
+                  </label>
+                  <input
+                    type="text"
+                    name="parokiKotaBaptis"
+                    value={formData.parokiKotaBaptis}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="Contoh: Paroki St. Vincentius A Paulo - Kota Kediri"
+                    className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
+                  />
+                </div>
+
+                {/* Sakramen Lainnya (Tombol Kartu Besar Ramah Lansia) */}
+                <div className="flex flex-col md:col-span-2">
+                  <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-2">
+                    Sakramen Katolik Lainnya Yang Sudah Diterima
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    
+                    {/* Komuni Pertama */}
                     <button
                       type="button"
                       onClick={() => handleSakramenToggle('komuniPertama')}
-                      className={`p-2.5 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center gap-1 min-h-[50px] ${
+                      className={`p-3.5 rounded-2xl border-2 font-bold text-sm sm:text-base transition flex items-center justify-between min-h-[54px] cursor-pointer ${
                         formData.komuniPertama
-                          ? 'bg-sky-500 text-white border-sky-600 shadow-xs'
-                          : 'bg-slate-50 text-slate-600 border-slate-300'
+                          ? 'bg-sky-900 border-sky-950 text-white shadow-md'
+                          : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      <Check className={`w-3.5 h-3.5 ${formData.komuniPertama ? 'opacity-100' : 'opacity-0'}`} />
-                      <span>Komuni I</span>
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center border ${
+                          formData.komuniPertama ? 'bg-orange-500 border-orange-400 text-white' : 'border-slate-400 bg-white'
+                        }`}>
+                          {formData.komuniPertama && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                        <span>Komuni I</span>
+                      </div>
+                      <span className="text-xs font-normal opacity-80">{formData.komuniPertama ? 'Sudah' : 'Belum'}</span>
                     </button>
 
+                    {/* Krisma */}
                     <button
                       type="button"
                       onClick={() => handleSakramenToggle('krisma')}
-                      className={`p-2.5 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center gap-1 min-h-[50px] ${
+                      className={`p-3.5 rounded-2xl border-2 font-bold text-sm sm:text-base transition flex items-center justify-between min-h-[54px] cursor-pointer ${
                         formData.krisma
-                          ? 'bg-orange-500 text-white border-orange-600 shadow-xs'
-                          : 'bg-slate-50 text-slate-600 border-slate-300'
+                          ? 'bg-orange-600 border-orange-700 text-white shadow-md'
+                          : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      <Check className={`w-3.5 h-3.5 ${formData.krisma ? 'opacity-100' : 'opacity-0'}`} />
-                      <span>Krisma</span>
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center border ${
+                          formData.krisma ? 'bg-white text-orange-600' : 'border-slate-400 bg-white'
+                        }`}>
+                          {formData.krisma && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                        <span>Krisma</span>
+                      </div>
+                      <span className="text-xs font-normal opacity-80">{formData.krisma ? 'Sudah' : 'Belum'}</span>
                     </button>
 
+                    {/* Pernikahan Katolik */}
                     <button
                       type="button"
                       onClick={() => handleSakramenToggle('pernikahan')}
-                      className={`p-2.5 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center gap-1 min-h-[50px] ${
+                      className={`p-3.5 rounded-2xl border-2 font-bold text-sm sm:text-base transition flex items-center justify-between min-h-[54px] cursor-pointer ${
                         formData.pernikahan
-                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                          : 'bg-slate-50 text-slate-600 border-slate-300'
+                          ? 'bg-emerald-700 border-emerald-800 text-white shadow-md'
+                          : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      <Check className={`w-3.5 h-3.5 ${formData.pernikahan ? 'opacity-100' : 'opacity-0'}`} />
-                      <span>Nikah Katolik</span>
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center border ${
+                          formData.pernikahan ? 'bg-white text-emerald-700' : 'border-slate-400 bg-white'
+                        }`}>
+                          {formData.pernikahan && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                        <span>Nikah Katolik</span>
+                      </div>
+                      <span className="text-xs font-normal opacity-80">{formData.pernikahan ? 'Sudah' : 'Belum'}</span>
                     </button>
+
                   </div>
                 </div>
+
               </div>
             </div>
           ) : (
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-600 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-slate-400" />
-              <span>Bagian sakramen Katolik (Baptis, Komuni, Krisma) tidak ditampilkan untuk pendaftar beragama {formData.agama}.</span>
+            <div className="p-4 bg-slate-100 border border-slate-300 rounded-2xl text-xs sm:text-sm text-slate-700 flex items-center gap-2 font-medium">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0" />
+              <span>Bagian sakramen Katolik (Baptis, Komuni, Krisma) dilewati untuk pendaftar beragama {formData.agama}.</span>
             </div>
           )}
 
-          {/* SECTION 3: DOMISILI LINGKUNGAN & SOSIAL */}
-          <div>
-            <div className="flex items-center gap-2 pb-2 border-b-2 border-orange-400 text-sky-950 font-bold text-sm sm:text-base mb-3 sm:mb-4">
-              <span className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-extrabold shrink-0">
+          {/* ========================================================
+              SECTION 3: ALAMAT DOMISILI, RT/RW & INFORMASI TAMBAHAN
+             ======================================================== */}
+          <div className="space-y-5 pt-3 border-t-2 border-slate-200">
+            {/* Section Header */}
+            <div className="bg-sky-900 text-white p-3.5 sm:p-4 rounded-2xl flex items-center gap-3 border-l-6 border-orange-500 shadow-xs">
+              <span className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-sm">
                 {isKatolik ? '3' : '2'}
               </span>
-              <span>Alamat Domisili Semampir & Informasi Tambahan (Title Case)</span>
+              <div>
+                <h3 className="text-sm sm:text-base font-extrabold uppercase tracking-wide">
+                  Alamat Domisili Semampir & Wilayah RT / RW
+                </h3>
+                <p className="text-xs text-sky-200 mt-0.5">
+                  Isikan alamat rumah tinggal dan nomor RT/RW di Kelurahan Semampir.
+                </p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-5">
-              {/* Alamat Domisili Semampir */}
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Alamat Rumah / Domisili di Semampir Kota Kediri <span className="text-rose-500">*</span>
-                  <span className="text-[10px] text-orange-600 font-semibold normal-case ml-1">(Title Case)</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+              
+              {/* Alamat Rumah Lengkap (Full Width) */}
+              <div className="flex flex-col md:col-span-2">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5 flex items-center justify-between">
+                  <span>Alamat Rumah / Domisili di Semampir <span className="text-rose-600 font-black">*</span></span>
+                  <span className="text-xs text-orange-700 font-bold bg-orange-100 px-2 py-0.5 rounded">Huruf Awal Kapital</span>
                 </label>
                 <div className="relative">
                   <input
@@ -727,68 +809,80 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                     value={formData.alamatDomisili}
                     onChange={handleChange}
                     onBlur={handleBlur}
-                    placeholder="Contoh: Jl. Mayor Bismo No. 42, Kel. Semampir, Kota Kediri"
-                    className="w-full pl-3.5 pr-8 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
+                    placeholder="Contoh: Jl. Mayor Bismo No. 42, Kelurahan Semampir, Kota Kediri"
+                    className="w-full pl-4 pr-11 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                     required
                   />
-                  <MapPin className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 sm:top-3" />
+                  <MapPin className="w-5 h-5 text-slate-400 absolute right-3.5 top-4 pointer-events-none" />
                 </div>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                  Alamat jalan, gang, atau nomor rumah tempat tinggal saat ini.
+                </p>
               </div>
 
-              {/* INPUT RT SENDIRI & RW SENDIRI (BUKAN DROPDOWN / LIST DOWN) */}
-              <div className="sm:col-span-2 grid grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 bg-sky-50/50 rounded-2xl border-2 border-sky-200">
-                {/* Input RT Sendiri */}
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    RT (Rukun Tetangga) <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      name="rt"
-                      inputMode="numeric"
-                      value={formData.rt}
-                      onChange={handleChange}
-                      placeholder="02"
-                      maxLength={4}
-                      className="w-full pl-3 pr-10 py-3 sm:py-2.5 rounded-xl border-2 border-sky-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white font-mono font-bold text-sky-950 min-h-[44px]"
-                      required
-                    />
-                    <span className="text-xs text-sky-700 absolute right-3 top-3.5 sm:top-3 font-bold pointer-events-none">
-                      RT
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">Ketik nomor RT (Input mandiri)</p>
+              {/* CARD KHUSUS INPUT RT & RW SECARA MANDIRI (SEIMBANG & SIMETRIS) */}
+              <div className="md:col-span-2 bg-gradient-to-br from-sky-50 via-white to-orange-50/30 p-4 sm:p-6 rounded-2xl border-2 border-sky-300 shadow-sm">
+                <div className="mb-3.5">
+                  <h4 className="text-sm sm:text-base font-black text-sky-950">
+                    Nomor Rukun Tetangga (RT) & Rukun Warga (RW) <span className="text-rose-600">*</span>
+                  </h4>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                    Ketik langsung nomor RT dan RW domisili Anda di Kelurahan Semampir.
+                  </p>
                 </div>
 
-                {/* Input RW Sendiri */}
-                <div>
-                  <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    RW (Rukun Warga) <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      name="rw"
-                      inputMode="numeric"
-                      value={formData.rw}
-                      onChange={handleChange}
-                      placeholder="01"
-                      maxLength={4}
-                      className="w-full pl-3 pr-10 py-3 sm:py-2.5 rounded-xl border-2 border-sky-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white font-mono font-bold text-sky-950 min-h-[44px]"
-                      required
-                    />
-                    <span className="text-xs text-sky-700 absolute right-3 top-3.5 sm:top-3 font-bold pointer-events-none">
-                      RW
-                    </span>
+                <div className="grid grid-cols-2 gap-3 sm:gap-6">
+                  {/* RT */}
+                  <div className="flex flex-col">
+                    <label className="text-xs sm:text-sm font-extrabold text-sky-900 mb-1">
+                      Nomor RT <span className="text-rose-600">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="rt"
+                        inputMode="numeric"
+                        value={formData.rt}
+                        onChange={handleChange}
+                        placeholder="02"
+                        maxLength={4}
+                        className="w-full pl-4 pr-12 py-3.5 rounded-xl border-2 border-sky-400 focus:border-sky-600 focus:ring-4 focus:ring-sky-100 text-lg sm:text-xl font-mono font-black text-sky-950 bg-white min-h-[52px] shadow-2xs"
+                        required
+                      />
+                      <span className="text-xs sm:text-sm font-black text-sky-700 bg-sky-100 px-2 py-1 rounded-md absolute right-2.5 top-3 pointer-events-none">
+                        RT
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1">Ketik nomor RW (Input mandiri)</p>
+
+                  {/* RW */}
+                  <div className="flex flex-col">
+                    <label className="text-xs sm:text-sm font-extrabold text-sky-900 mb-1">
+                      Nomor RW <span className="text-rose-600">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="rw"
+                        inputMode="numeric"
+                        value={formData.rw}
+                        onChange={handleChange}
+                        placeholder="01"
+                        maxLength={4}
+                        className="w-full pl-4 pr-12 py-3.5 rounded-xl border-2 border-sky-400 focus:border-sky-600 focus:ring-4 focus:ring-sky-100 text-lg sm:text-xl font-mono font-black text-sky-950 bg-white min-h-[52px] shadow-2xs"
+                        required
+                      />
+                      <span className="text-xs sm:text-sm font-black text-sky-700 bg-sky-100 px-2 py-1 rounded-md absolute right-2.5 top-3 pointer-events-none">
+                        RW
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Pekerjaan */}
-              <div>
-                <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
                   Pekerjaan / Profesi
                 </label>
                 <input
@@ -797,14 +891,14 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   value={formData.pekerjaan}
                   onChange={handleChange}
                   onBlur={handleBlur}
-                  placeholder="Contoh: Guru, Karyawan Swasta, Wiraswasta"
-                  className="w-full px-3 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
+                  placeholder="Contoh: Guru, Karyawan Swasta, Pensiunan"
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                 />
               </div>
 
-              {/* Pendidikan */}
-              <div>
-                <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              {/* Pendidikan Terakhir */}
+              <div className="flex flex-col">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
                   Pendidikan Terakhir
                 </label>
                 <input
@@ -814,14 +908,14 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Contoh: S1 Ekonomi, SMA/SMK, SMP, SD"
-                  className="w-full px-3 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                 />
               </div>
 
-              {/* Catatan / Keterlibatan Gereja */}
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Keterlibatan / Catatan Khusus
+              {/* Catatan Khusus / Keterlibatan Gereja (Full Width) */}
+              <div className="flex flex-col md:col-span-2">
+                <label className="text-sm sm:text-base font-extrabold text-sky-950 mb-1.5">
+                  Keterlibatan Pelayanan Gereja / Catatan Khusus
                 </label>
                 <input
                   type="text"
@@ -829,38 +923,48 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   value={formData.catatanKhusus}
                   onChange={handleChange}
                   onBlur={handleBlur}
-                  placeholder="Contoh: Koor, Misdinar, Pemandu Doa Rosario, Sie Liturgi"
-                  className="w-full px-3.5 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 text-base sm:text-sm bg-white min-h-[44px]"
+                  placeholder="Contoh: Koor, Misdinar, Pemandu Doa Rosario, Lansia Butuh Komuni Sakit"
+                  className="w-full px-4 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-orange-500 focus:bg-orange-50/15 focus:ring-4 focus:ring-orange-100 text-base sm:text-lg font-bold text-slate-900 bg-white min-h-[52px] sm:min-h-[56px] shadow-2xs"
                 />
+                <p className="text-xs sm:text-sm text-slate-600 mt-1.5 font-medium">
+                  Catatan pelayanan atau kondisi khusus lansia (misal: kunjungan pastor/romo, komuni orang sakit).
+                </p>
               </div>
+
             </div>
           </div>
 
-          {/* Quick Option: Pertahankan No KK & Alamat untuk Anggota Keluarga Berikutnya */}
+          {/* Opsi Kunci No. KK & Alamat untuk Input Anggota Keluarga Berikutnya */}
           <div 
             onClick={() => setKeepFamilyData(!keepFamilyData)}
-            className="bg-orange-50/80 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-orange-300 flex items-center justify-between cursor-pointer select-none active:bg-orange-100 transition"
+            className="bg-orange-50 hover:bg-orange-100/70 p-4 sm:p-5 rounded-2xl border-2 border-orange-300 flex items-center justify-between cursor-pointer select-none active:scale-[0.99] transition shadow-xs"
           >
-            <div className="flex items-center gap-2.5">
-              <div className={`w-5 h-5 rounded-md flex items-center justify-center border ${
-                keepFamilyData ? 'bg-orange-500 border-orange-600 text-white' : 'border-slate-300 bg-white'
+            <div className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition ${
+                keepFamilyData ? 'bg-orange-600 border-orange-700 text-white' : 'border-slate-400 bg-white'
               }`}>
-                {keepFamilyData && <Check className="w-3.5 h-3.5" />}
+                {keepFamilyData && <Check className="w-4 h-4 stroke-[3]" />}
               </div>
-              <span className="text-xs sm:text-sm font-bold text-orange-950">
-                Pertahankan No. KK, Alamat, RT {formData.rt} & RW {formData.rw} untuk anggota keluarga berikutnya
-              </span>
+              <div>
+                <span className="text-sm sm:text-base font-black text-orange-950 block">
+                  Pertahankan No. KK, Alamat, RT {formData.rt} & RW {formData.rw}
+                </span>
+                <span className="text-xs text-orange-800 font-medium">
+                  Sangat memudahkan saat mendaftarkan seluruh anggota keluarga dalam 1 KK secara berurutan.
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Submit Actions */}
-          <div className="pt-2 sm:pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 self-start sm:self-center">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Data tersimpan aman di database Paroki St. Vincentius a Paulo.</span>
+          {/* Tombol Aksi Simpan & Reset: Tombol Besar, Jelas & Ramah Lansia */}
+          <div className="pt-4 border-t-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600 font-medium self-start sm:self-center">
+              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>Data otomatis tersimpan di database pusat Paroki St. Vincentius a Paulo.</span>
             </div>
 
-            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              {/* Tombol Reset */}
               <button
                 type="button"
                 onClick={() => {
@@ -892,27 +996,30 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   });
                   setErrorMsg(null);
                 }}
-                className="px-4 py-3 sm:py-2.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs sm:text-sm font-semibold transition min-h-[48px] sm:min-h-[44px]"
+                className="px-5 py-3.5 rounded-2xl border-2 border-slate-300 text-slate-700 hover:bg-slate-100 text-sm font-bold transition min-h-[52px] sm:min-h-[56px] flex items-center justify-center gap-2 cursor-pointer active:scale-95"
               >
-                Reset
+                <RotateCcw className="w-4 h-4 text-slate-500" />
+                <span>Reset</span>
               </button>
 
+              {/* Tombol Simpan & Daftarkan Warga */}
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 sm:flex-none px-6 py-3 sm:py-2.5 rounded-xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-md active:scale-98 transition-all border border-orange-600 flex items-center justify-center gap-2 min-h-[48px] sm:min-h-[44px] disabled:opacity-50"
+                className="flex-1 sm:flex-none px-7 py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-base sm:text-lg shadow-lg active:scale-98 transition-all border-2 border-orange-600 flex items-center justify-center gap-2.5 min-h-[52px] sm:min-h-[56px] disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? (
-                  <span>Menyimpan...</span>
+                  <span>Menyimpan ke Database...</span>
                 ) : (
                   <>
-                    <UserPlus className="w-4 h-4 text-orange-100" />
+                    <UserPlus className="w-5 h-5 text-orange-100" />
                     <span>Simpan & Daftarkan Warga</span>
                   </>
                 )}
               </button>
             </div>
           </div>
+
         </form>
       </div>
     </div>

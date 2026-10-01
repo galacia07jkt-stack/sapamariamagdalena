@@ -1,12 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
-import { MobileBottomNav } from './components/MobileBottomNav';
-import { ParishHeader } from './components/ParishHeader';
 import { FormInputWarga } from './components/FormInputWarga';
 import { CekUlangWarga } from './components/CekUlangWarga';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -15,20 +8,22 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { EditWargaModal } from './components/EditWargaModal';
 import { BuktiRegistrasiModal } from './components/BuktiRegistrasiModal';
 import { EnkripsiSecurityModal } from './components/EnkripsiSecurityModal';
-import { SapaLogo } from './components/SapaLogo';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { WargaKatolik, StatistikParoki } from './types';
 import { 
   getStoredWarga, 
   hitungStatistikParoki, 
   isAdminAuthenticated, 
-  logoutAdmin 
+  logoutAdmin,
+  syncWithServer 
 } from './utils/storage';
 import { 
   ShieldCheck, 
   MapPin, 
   Phone, 
   FileSpreadsheet, 
-  CheckCircle2
+  CheckCircle2,
+  Wifi
 } from 'lucide-react';
 
 export default function App() {
@@ -39,8 +34,10 @@ export default function App() {
   const [securityVaultOpen, setSecurityVaultOpen] = useState(false);
   const [editingWarga, setEditingWarga] = useState<WargaKatolik | null>(null);
   const [viewingBukti, setViewingBukti] = useState<WargaKatolik | null>(null);
+  const [buktiMode, setBuktiMode] = useState<'registration' | 'admin'>('registration');
+  const [isServerOnline, setIsServerOnline] = useState<boolean>(true);
 
-  // Sync data from storage
+  // Sync data from storage & server
   const refreshData = () => {
     const data = getStoredWarga();
     setWargaList(data);
@@ -49,6 +46,40 @@ export default function App() {
 
   useEffect(() => {
     refreshData();
+
+    // 1. Initial sync with server
+    syncWithServer()
+      .then((data) => {
+        setWargaList(data);
+        setIsServerOnline(true);
+      })
+      .catch(() => {
+        setIsServerOnline(false);
+      });
+
+    // 2. Real-Time Auto-Polling setiap 3.5 detik
+    // Memastikan jika warga input dari HP atau laptop lain, data langsung otomatis masuk
+    // dan tampil di layar admin tanpa perlu reload halaman!
+    const pollingInterval = setInterval(() => {
+      syncWithServer()
+        .then((data) => {
+          setIsServerOnline(true);
+        })
+        .catch(() => {
+          setIsServerOnline(false);
+        });
+    }, 3500);
+
+    // 3. Listener perubahan saat tab/layar diaktifkan kembali
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncWithServer();
+      }
+    };
+
+    const handleFocus = () => {
+      syncWithServer();
+    };
 
     const handleUpdate = () => {
       refreshData();
@@ -61,11 +92,16 @@ export default function App() {
     window.addEventListener('sapa-warga-updated', handleUpdate);
     window.addEventListener('sapa-auth-changed', handleAuth);
     window.addEventListener('storage', handleUpdate);
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
+      clearInterval(pollingInterval);
       window.removeEventListener('sapa-warga-updated', handleUpdate);
       window.removeEventListener('sapa-auth-changed', handleAuth);
       window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
@@ -73,10 +109,12 @@ export default function App() {
     return hitungStatistikParoki(wargaList);
   }, [wargaList]);
 
-  // Handle citizen registration success
+  // Handle citizen registration success: Warga Input Mandiri
   const handleWargaRegistered = (newWarga: WargaKatolik) => {
     refreshData();
+    setBuktiMode('registration'); // Mode Registrasi Warga: Tombol adalah "Selesai & Kembali ke Form"
     setViewingBukti(newWarga);
+    syncWithServer();
   };
 
   // Handle admin login success
@@ -121,22 +159,34 @@ export default function App() {
         onOpenLogin={() => setLoginModalOpen(true)}
         onLogout={handleLogout}
         onOpenSecurityVault={handleOpenSecurityVault}
-        totalJiwa={wargaList.length}
+        totalJiwa={stats.totalJiwa}
       />
 
-      {/* Main Container - Added pb-24 for mobile bottom navigation clearance */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-7 pb-24 md:pb-12">
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8">
         
-        {/* Hero Header with Parish Details and SAPA Logo */}
-        <ParishHeader
-          stats={stats}
-          onCekDataClick={() => setActiveTab('cek')}
-          onDaftarClick={() => setActiveTab('input')}
-        />
+        {/* Status Indikator Sinkronisasi Server Pusat untuk Admin */}
+        {isAdmin && activeTab === 'admin' && (
+          <div className="mb-4 px-3.5 py-2 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between text-xs text-emerald-900">
+            <div className="flex items-center gap-2 font-medium">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span>
+                <strong>Database Server Pusat Aktif:</strong> Terkoneksi & tersinkronisasi real-time dengan seluruh HP/Laptop warga yang input data.
+              </span>
+            </div>
+            <div className="hidden sm:flex items-center gap-1 font-mono text-[11px] text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
+              <Wifi className="w-3.5 h-3.5" />
+              <span>Real-Time Polling 3.5s</span>
+            </div>
+          </div>
+        )}
 
-        {/* Tab 1: Input Data Warga */}
+        {/* Tab 1: Pendaftaran Mandiri Warga */}
         {activeTab === 'input' && (
-          <div className="animate-fade-in">
+          <div className="max-w-4xl mx-auto animate-fade-in">
             <FormInputWarga onSuccess={handleWargaRegistered} />
           </div>
         )}
@@ -145,7 +195,10 @@ export default function App() {
         {activeTab === 'cek' && (
           <div className="animate-fade-in">
             <CekUlangWarga
-              onOpenBukti={(w) => setViewingBukti(w)}
+              onOpenBukti={(w) => {
+                setBuktiMode('registration');
+                setViewingBukti(w);
+              }}
               onGoToInput={() => setActiveTab('input')}
             />
           </div>
@@ -162,7 +215,10 @@ export default function App() {
               wargaList={wargaList}
               onAddNew={() => setActiveTab('input')}
               onEdit={(w) => setEditingWarga(w)}
-              onViewBukti={(w) => setViewingBukti(w)}
+              onViewBukti={(w) => {
+                setBuktiMode('admin'); // Akses Admin: Tombol adalah "Cetak / PDF"
+                setViewingBukti(w);
+              }}
             />
           </div>
         )}
@@ -263,7 +319,7 @@ export default function App() {
                 </li>
                 <li className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
-                  <span>Siap Online di Vercel.app & GitHub</span>
+                  <span>Database Centralized: Input HP langsung masuk ke Laptop Admin</span>
                 </li>
               </ul>
             </div>
@@ -295,6 +351,7 @@ export default function App() {
         onClose={() => setEditingWarga(null)}
         onSuccess={() => {
           refreshData();
+          syncWithServer();
           setEditingWarga(null);
         }}
       />
@@ -307,14 +364,17 @@ export default function App() {
           setViewingBukti(null);
           setActiveTab('input');
         }}
-        isAdmin={isAdmin}
+        mode={buktiMode}
       />
 
       {/* Security & Encryption Vault Modal (Hanya Akses Admin) */}
       <EnkripsiSecurityModal
         isOpen={securityVaultOpen}
         onClose={() => setSecurityVaultOpen(false)}
-        onDataRestored={() => refreshData()}
+        onDataRestored={() => {
+          refreshData();
+          syncWithServer();
+        }}
         isAdmin={isAdmin}
         onOpenLogin={() => setLoginModalOpen(true)}
       />
