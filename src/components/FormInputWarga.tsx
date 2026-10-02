@@ -8,7 +8,8 @@ import {
   ShieldCheck, 
   Check, 
   Calendar,
-  RotateCcw
+  RotateCcw,
+  Save
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WargaKatolik, AgamaType } from '../types';
@@ -114,43 +115,56 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
     const cleanKk = formData.noKk.replace(/\D/g, '');
     const cleanNik = formData.nik.replace(/\D/g, '');
 
+    const reportError = (msg: string, elementId?: string) => {
+      setErrorMsg(msg);
+      if (elementId) {
+        const el = document.getElementById(elementId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.focus();
+          return;
+        }
+      }
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+    };
+
     if (cleanKk.length !== 16) {
-      setErrorMsg('Nomor Kartu Keluarga (No. KK) harus tepat 16 digit angka.');
+      reportError(`Nomor Kartu Keluarga (No. KK) harus tepat 16 digit angka (saat ini: ${cleanKk.length} digit).`, 'input-no-kk');
       return;
     }
 
     if (cleanNik.length !== 16) {
-      setErrorMsg('Nomor Induk Kependudukan (NIK) harus tepat 16 digit angka.');
+      reportError(`Nomor Induk Kependudukan (NIK) harus tepat 16 digit angka (saat ini: ${cleanNik.length} digit).`, 'input-nik');
       return;
     }
 
     if (!formData.namaLengkap.trim()) {
-      setErrorMsg('Nama lengkap warga wajib diisi.');
+      reportError('Nama lengkap jemaat/warga sesuai KTP wajib diisi.', 'input-nama-lengkap');
       return;
     }
 
     if (!formData.rt.trim()) {
-      setErrorMsg('Nomor RT wajib diisi.');
+      reportError('Nomor RT wajib diisi (contoh: 02).', 'input-rt');
       return;
     }
 
     if (!formData.rw.trim()) {
-      setErrorMsg('Nomor RW wajib diisi.');
+      reportError('Nomor RW wajib diisi (contoh: 01).', 'input-rw');
       return;
     }
 
     if (formData.tanggalLahir && !isValidDdMmYyyy(formData.tanggalLahir)) {
-      setErrorMsg('Format tanggal lahir harus DD/MM/YYYY (contoh: 15/08/1995).');
+      reportError('Format tanggal lahir harus DD/MM/YYYY (contoh: 15/08/1995).', 'input-tanggal-lahir');
       return;
     }
 
     if (isKatolik && !formData.namaBaptis.trim()) {
-      setErrorMsg('Untuk warga Katolik, nama baptis (Santo/Santa pelindung) wajib diisi.');
+      reportError('Untuk jemaat Katolik, mohon isi nama baptis Santo/Santa (jika belum ada, ketik tanda - ).', 'input-nama-baptis');
       return;
     }
 
     if (isKatolik && formData.tanggalBaptis && !isValidDdMmYyyy(formData.tanggalBaptis)) {
-      setErrorMsg('Format tanggal baptis harus DD/MM/YYYY (contoh: 22/08/1995).');
+      reportError('Format tanggal baptis harus DD/MM/YYYY (contoh: 22/08/1995).', 'input-tanggal-baptis');
       return;
     }
 
@@ -353,6 +367,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   <span className="text-xs text-slate-500 font-normal">Wajib 16 digit</span>
                 </label>
                 <input
+                  id="input-no-kk"
                   type="text"
                   name="noKk"
                   inputMode="numeric"
@@ -376,6 +391,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   <span className="text-xs text-slate-500 font-normal">Wajib 16 digit</span>
                 </label>
                 <input
+                  id="input-nik"
                   type="text"
                   name="nik"
                   inputMode="numeric"
@@ -399,6 +415,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   <span className="text-xs text-orange-700 font-bold bg-orange-100 px-2 py-0.5 rounded">Huruf Awal Kapital Otomatis</span>
                 </label>
                 <input
+                  id="input-nama-lengkap"
                   type="text"
                   name="namaLengkap"
                   value={formData.namaLengkap}
@@ -970,11 +987,26 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
             </div>
           </div>
 
-          {/* Tombol Aksi Simpan & Reset: Tombol Besar, Jelas & Ramah Lansia */}
+          {/* Error Banner Dekat Tombol Simpan (Minimalis, Kontras Jelas, Ramah Lansia) */}
+          {errorMsg && (
+            <div className="p-4 sm:p-5 bg-rose-50 border-2 border-rose-500 rounded-2xl flex items-start gap-3.5 text-rose-950 shadow-sm animate-fade-in">
+              <AlertCircle className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="font-black text-rose-900 text-sm sm:text-base block">
+                  Perhatian: Data Belum Lengkap / Perlu Diperbaiki
+                </span>
+                <p className="text-xs sm:text-sm font-semibold text-rose-800 mt-0.5 leading-relaxed">
+                  {errorMsg}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Tombol Aksi Simpan & Reset: Desain Minimalis, Font Besar & Ramah Lansia */}
           <div className="pt-4 border-t-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600 font-medium self-start sm:self-center">
               <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>Data otomatis tersimpan di database pusat Paroki St. Vincentius a Paulo.</span>
+              <span>Data tersimpan aman di database Paroki St. Vincentius a Paulo.</span>
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -1010,24 +1042,24 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   });
                   setErrorMsg(null);
                 }}
-                className="px-5 py-3.5 rounded-2xl border-2 border-slate-300 text-slate-700 hover:bg-slate-100 text-sm font-bold transition min-h-[52px] sm:min-h-[56px] flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                className="px-5 py-3.5 rounded-2xl border-2 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700 text-sm sm:text-base font-bold transition min-h-[52px] sm:min-h-[56px] flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-2xs"
               >
                 <RotateCcw className="w-4 h-4 text-slate-500" />
                 <span>Reset</span>
               </button>
 
-              {/* Tombol Simpan & Daftarkan Warga */}
+              {/* Tombol Simpan dengan Icon Save (Minimalis, Kontras Tinggi & Ramah Lansia) */}
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 sm:flex-none px-7 py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-base sm:text-lg shadow-lg active:scale-98 transition-all border-2 border-orange-600 flex items-center justify-center gap-2.5 min-h-[52px] sm:min-h-[56px] disabled:opacity-50 cursor-pointer"
+                className="flex-1 sm:flex-none px-7 sm:px-9 py-3.5 sm:py-4 rounded-2xl bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-black text-base sm:text-lg shadow-md active:scale-[0.98] transition-all border-2 border-orange-700 flex items-center justify-center gap-3 min-h-[54px] sm:min-h-[58px] disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? (
                   <span>Menyimpan ke Database...</span>
                 ) : (
                   <>
-                    <UserPlus className="w-5 h-5 text-orange-100" />
-                    <span>Simpan & Daftarkan Warga</span>
+                    <Save className="w-6 h-6 text-white shrink-0" />
+                    <span>Simpan Data Warga</span>
                   </>
                 )}
               </button>
