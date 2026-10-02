@@ -254,7 +254,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ stats, wargaList
           <div className="mt-3 flex items-baseline gap-3">
             <div>
               <span className="text-2xl font-bold text-slate-800">{stats.totalKomuni}</span>
-              <span className="text-[11px] text-slate-500 block">Komuni I</span>
+              <span className="text-[11px] text-slate-500 block">Komuni 1</span>
             </div>
             <div className="h-6 w-px bg-slate-200" />
             <div>
@@ -263,7 +263,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ stats, wargaList
             </div>
           </div>
           <div className="mt-2 text-xs text-slate-500">
-            Nikah Katolik: <strong>{stats.totalNikahKatolik} Pasang</strong>
+            Perkawinan: <strong>{stats.totalNikahKatolik} Pasang</strong>
           </div>
         </div>
 

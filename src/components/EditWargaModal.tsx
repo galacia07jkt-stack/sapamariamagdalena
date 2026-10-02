@@ -48,10 +48,10 @@ export const EditWargaModal: React.FC<EditWargaModalProps> = ({
 
   const agamaList: AgamaType[] = [
     'Katolik',
-    'Kristen Protestan',
     'Islam',
     'Hindu',
     'Buddha',
+    'Protestan',
     'Kepercayaan',
   ];
 
@@ -390,7 +390,7 @@ export const EditWargaModal: React.FC<EditWargaModalProps> = ({
                       }
                       className="w-4 h-4 text-orange-600 rounded border-slate-300"
                     />
-                    <span>Komuni I</span>
+                    <span>Komuni 1</span>
                   </label>
 
                   <label className="flex items-center gap-1.5 text-xs font-bold cursor-pointer">
@@ -420,7 +420,7 @@ export const EditWargaModal: React.FC<EditWargaModalProps> = ({
                       }
                       className="w-4 h-4 text-orange-600 rounded border-slate-300"
                     />
-                    <span>Nikah Katolik</span>
+                    <span>Perkawinan</span>
                   </label>
                 </div>
               </div>

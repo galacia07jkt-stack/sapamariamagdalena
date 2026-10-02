@@ -1,11 +1,18 @@
-export type AgamaType = 'Katolik' | 'Kristen Protestan' | 'Islam' | 'Hindu' | 'Buddha' | 'Kepercayaan';
+export type AgamaType = 
+  | 'Katolik' 
+  | 'Islam' 
+  | 'Hindu' 
+  | 'Buddha' 
+  | 'Protestan' 
+  | 'Kristen Protestan' 
+  | 'Kepercayaan';
 
 export interface WargaKatolik {
   id: string;
   noKk: string; // 16 digit Nomor Kartu Keluarga
   nik: string; // 16 digit NIK Kependudukan
   namaLengkap: string; // Nama lengkap KTP (HURUF KAPITAL)
-  agama: AgamaType; // Katolik, Kristen Protestan, Islam, Hindu, Buddha, Kepercayaan
+  agama: AgamaType; // Katolik, Islam, Hindu, Buddha, Protestan, Kepercayaan
   namaBaptis: string; // Nama Baptis Santo/Santa pelindung (jika Katolik)
   jenisKelamin: 'L' | 'P';
   tempatLahir: string;

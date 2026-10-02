@@ -8,7 +8,6 @@ import {
   ShieldCheck, 
   Check, 
   Calendar,
-  Sparkles,
   RotateCcw
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -56,10 +55,10 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
 
   const agamaList: AgamaType[] = [
     'Katolik',
-    'Kristen Protestan',
     'Islam',
     'Hindu',
     'Buddha',
+    'Protestan',
     'Kepercayaan',
   ];
 
@@ -275,10 +274,6 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
               <p className="text-xs sm:text-sm text-sky-200 mt-0.5 font-medium">
                 Lingkungan St. Maria Magdalena Semampir Kediri
               </p>
-              <div className="mt-2 inline-flex items-center gap-1.5 bg-orange-500/30 border border-orange-400/60 px-2.5 py-0.5 rounded-lg text-xs font-bold text-orange-200">
-                <Sparkles className="w-3.5 h-3.5 text-orange-300" />
-                <span>Tampilan Ramah Lansia • Huruf Jelas & Tertata Rapi</span>
-              </div>
             </div>
           </div>
         </div>
@@ -431,7 +426,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                 >
                   {agamaList.map((agm) => (
                     <option key={agm} value={agm}>
-                      {agm === 'Katolik' ? '✝️ Katolik (Data Sakramen Baptis Ditampilkan)' : agm}
+                      {agm}
                     </option>
                   ))}
                 </select>
@@ -700,7 +695,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     
-                    {/* Komuni Pertama */}
+                    {/* Komuni 1 */}
                     <button
                       type="button"
                       onClick={() => handleSakramenToggle('komuniPertama')}
@@ -716,7 +711,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                         }`}>
                           {formData.komuniPertama && <Check className="w-3.5 h-3.5" />}
                         </div>
-                        <span>Komuni I</span>
+                        <span>Komuni 1</span>
                       </div>
                       <span className="text-xs font-normal opacity-80">{formData.komuniPertama ? 'Sudah' : 'Belum'}</span>
                     </button>
@@ -742,7 +737,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                       <span className="text-xs font-normal opacity-80">{formData.krisma ? 'Sudah' : 'Belum'}</span>
                     </button>
 
-                    {/* Pernikahan Katolik */}
+                    {/* Perkawinan */}
                     <button
                       type="button"
                       onClick={() => handleSakramenToggle('pernikahan')}
@@ -758,7 +753,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
                         }`}>
                           {formData.pernikahan && <Check className="w-3.5 h-3.5" />}
                         </div>
-                        <span>Nikah Katolik</span>
+                        <span>Perkawinan</span>
                       </div>
                       <span className="text-xs font-normal opacity-80">{formData.pernikahan ? 'Sudah' : 'Belum'}</span>
                     </button>
@@ -934,24 +929,43 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
             </div>
           </div>
 
-          {/* Opsi Kunci No. KK & Alamat untuk Input Anggota Keluarga Berikutnya */}
+          {/* Opsi Kunci No. KK & Alamat untuk Input Anggota Keluarga Berikutnya (Super Responsif di HP) */}
           <div 
             onClick={() => setKeepFamilyData(!keepFamilyData)}
-            className="bg-orange-50 hover:bg-orange-100/70 p-4 sm:p-5 rounded-2xl border-2 border-orange-300 flex items-center justify-between cursor-pointer select-none active:scale-[0.99] transition shadow-xs"
+            role="checkbox"
+            aria-checked={keepFamilyData}
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setKeepFamilyData(!keepFamilyData); } }}
+            className={`p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer select-none active:scale-[0.99] shadow-sm flex items-start sm:items-center justify-between gap-3 sm:gap-4 ${
+              keepFamilyData 
+                ? 'bg-orange-50 border-orange-500 ring-2 ring-orange-200' 
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-300'
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition ${
-                keepFamilyData ? 'bg-orange-600 border-orange-700 text-white' : 'border-slate-400 bg-white'
+            <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+              {/* Checkbox Icon Box (Explicit shrink-0, perfectly square on all phones) */}
+              <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center border-2 shrink-0 transition-all mt-0.5 sm:mt-0 ${
+                keepFamilyData 
+                  ? 'bg-orange-600 border-orange-700 text-white shadow-sm' 
+                  : 'bg-white border-slate-400 text-transparent'
               }`}>
-                {keepFamilyData && <Check className="w-4 h-4 stroke-[3]" />}
+                <Check className={`w-5 h-5 stroke-[3] transition-transform ${keepFamilyData ? 'scale-100' : 'scale-50 opacity-0'}`} />
               </div>
-              <div>
-                <span className="text-sm sm:text-base font-black text-orange-950 block">
-                  Pertahankan No. KK, Alamat, RT {formData.rt} & RW {formData.rw}
-                </span>
-                <span className="text-xs text-orange-800 font-medium">
-                  Sangat memudahkan saat mendaftarkan seluruh anggota keluarga dalam 1 KK secara berurutan.
-                </span>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm sm:text-base font-black text-sky-950 block">
+                    Pertahankan No. KK, Alamat, RT {formData.rt} & RW {formData.rw}
+                  </span>
+                  <span className={`text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    keepFamilyData ? 'bg-orange-600 text-white' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {keepFamilyData ? '✓ Aktif' : 'Nonaktif'}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-600 font-medium mt-1 leading-relaxed">
+                  Data No. KK {formData.noKk ? `(${formData.noKk})` : ''}, Alamat, RT {formData.rt || '02'} & RW {formData.rw || '01'} otomatis tetap tersimpan untuk input anggota keluarga berikutnya.
+                </p>
               </div>
             </div>
           </div>

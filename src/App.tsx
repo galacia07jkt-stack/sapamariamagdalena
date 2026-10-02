@@ -326,11 +326,11 @@ export default function App() {
 
           </div>
 
-          <div className="mt-8 pt-6 border-t border-sky-900/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
-            <p>
-              © {new Date().getFullYear()} SAPA St. Maria Magdalena Semampir Kediri.
+          <div className="mt-8 pt-6 border-t border-sky-900/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-300 gap-2">
+            <p className="text-center sm:text-left">
+              © {new Date().getFullYear()} SAPA St. Maria Magdalena Semampir Kediri • Hak Cipta: <span className="text-orange-400 font-bold">sisirumah@Stefanus RizkiSBH.</span>
             </p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-400 text-center sm:text-right">
               Paroki St. Vincentius a Paulo Kota Kediri — Keuskupan Surabaya.
             </p>
           </div>

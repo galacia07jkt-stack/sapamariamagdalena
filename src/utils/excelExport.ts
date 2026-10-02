@@ -107,9 +107,9 @@ export async function exportWargaToExcel(
     { header: 'PAROKI / KOTA BAPTIS', key: 'parokiKotaBaptis', width: 26 },
     { header: 'TGL BAPTIS', key: 'tanggalBaptis', width: 14 },
     { header: 'NO. SURAT BAPTIS', key: 'noSuratBaptis', width: 20 },
-    { header: 'KOMUNI I', key: 'komuni', width: 11 },
+    { header: 'KOMUNI 1', key: 'komuni', width: 11 },
     { header: 'KRISMA', key: 'krisma', width: 11 },
-    { header: 'STATUS NIKAH', key: 'statusPerkawinan', width: 18 },
+    { header: 'PERKAWINAN', key: 'statusPerkawinan', width: 18 },
     { header: 'NO. WHATSAPP / HP', key: 'noHpWhatsapp', width: 18 },
     { header: 'VERIFIKASI', key: 'statusVerifikasi', width: 16 },
   ];

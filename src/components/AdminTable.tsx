@@ -46,10 +46,10 @@ export const AdminTable: React.FC<AdminTableProps> = ({
 
   const agamaList: AgamaType[] = [
     'Katolik',
-    'Kristen Protestan',
     'Islam',
     'Hindu',
     'Buddha',
+    'Protestan',
     'Kepercayaan',
   ];
 
@@ -299,9 +299,9 @@ export const AdminTable: React.FC<AdminTableProps> = ({
             className="w-full sm:w-auto px-2.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-sky-200 min-h-[44px]"
           >
             <option value="ALL">Semua Sakramen</option>
-            <option value="KOMUNI">Sudah Komuni I</option>
+            <option value="KOMUNI">Sudah Komuni 1</option>
             <option value="KRISMA">Sudah Krisma</option>
-            <option value="NIKAH">Menikah Katolik</option>
+            <option value="NIKAH">Sudah Perkawinan</option>
           </select>
 
           {/* Auto Export Toggle */}
