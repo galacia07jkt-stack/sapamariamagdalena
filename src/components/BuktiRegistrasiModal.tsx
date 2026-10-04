@@ -102,6 +102,12 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
               </div>
             )}
             <div className="flex items-center justify-between">
+              <span className="text-slate-500 font-medium">Tempat, Tgl Lahir:</span>
+              <span className="font-semibold text-slate-800 text-right">
+                {warga.tempatLahir ? `${warga.tempatLahir}, ` : ''}{warga.tanggalLahir || '-'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
               <span className="text-slate-500 font-medium">Wilayah RT/RW:</span>
               <span className="font-semibold text-slate-800 text-right">{warga.rtRw} Semampir</span>
             </div>
@@ -228,6 +234,12 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
               <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
                 <span className="text-slate-500 font-semibold">Nama Lengkap:</span>
                 <span className="col-span-2 font-extrabold text-sky-950 text-xs sm:text-sm">{warga.namaLengkap}</span>
+              </div>
+              <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                <span className="text-slate-500 font-semibold">Tempat, Tgl Lahir:</span>
+                <span className="col-span-2 font-medium text-slate-900">
+                  {warga.tempatLahir ? `${warga.tempatLahir}, ` : ''}{warga.tanggalLahir || '-'}
+                </span>
               </div>
               <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
                 <span className="text-slate-500 font-semibold">NIK (KTP):</span>

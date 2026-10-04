@@ -35,22 +35,22 @@ export async function exportWargaToExcel(
     right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
   };
 
-  // 1. HEADER KOP SURAT PAROKI & LINGKUNGAN (19 Kolom: A sampai S)
-  worksheet.mergeCells('A1:S1');
+  // 1. HEADER KOP SURAT PAROKI & LINGKUNGAN (21 Kolom: A sampai U)
+  worksheet.mergeCells('A1:U1');
   const titleRow1 = worksheet.getCell('A1');
   titleRow1.value = 'SAPA - SISTEM ADMINISTRASI PENDATAAN WARGA KATOLIK';
   titleRow1.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FF0369A1' } };
   titleRow1.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(1).height = 28;
 
-  worksheet.mergeCells('A2:S2');
+  worksheet.mergeCells('A2:U2');
   const titleRow2 = worksheet.getCell('A2');
   titleRow2.value = 'LINGKUNGAN ST. MARIA MAGDALENA - SEMAMPIR KOTA KEDIRI';
   titleRow2.font = { name: 'Arial', size: 13, bold: true, color: { argb: 'FFEA580C' } };
   titleRow2.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(2).height = 22;
 
-  worksheet.mergeCells('A3:S3');
+  worksheet.mergeCells('A3:U3');
   const titleRow3 = worksheet.getCell('A3');
   titleRow3.value = 'PAROKI ST. VINCENTIUS A PAULO KOTA KEDIRI - KEUSKUPAN SURABAYA';
   titleRow3.font = { name: 'Arial', size: 11, bold: false, italic: true, color: { argb: 'FF334155' } };
@@ -58,7 +58,7 @@ export async function exportWargaToExcel(
   worksheet.getRow(3).height = 20;
 
   // Garis oranye pembatas
-  worksheet.mergeCells('A4:S4');
+  worksheet.mergeCells('A4:U4');
   const dividerRow = worksheet.getCell('A4');
   dividerRow.fill = {
     type: 'pattern',
@@ -68,7 +68,7 @@ export async function exportWargaToExcel(
   worksheet.getRow(4).height = 4;
 
   // Baris Info Tanggal & Filter
-  worksheet.mergeCells('A5:I5');
+  worksheet.mergeCells('A5:K5');
   const infoLeft = worksheet.getCell('A5');
   const dateStr = new Date().toLocaleDateString('id-ID', {
     weekday: 'long',
@@ -80,8 +80,8 @@ export async function exportWargaToExcel(
   infoLeft.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF475569' } };
   infoLeft.alignment = { horizontal: 'left', vertical: 'middle' };
 
-  worksheet.mergeCells('J5:S5');
-  const infoRight = worksheet.getCell('J5');
+  worksheet.mergeCells('L5:U5');
+  const infoRight = worksheet.getCell('L5');
   const totalKkCount = new Set(daftarWarga.map((w) => w.noKk).filter(Boolean)).size;
   const totalKatolik = daftarWarga.filter((w) => (w.agama || 'Katolik') === 'Katolik').length;
   infoRight.value = `Rekap: ${daftarWarga.length} Jiwa (${totalKatolik} Katolik) | ${totalKkCount} KK`;
@@ -91,7 +91,7 @@ export async function exportWargaToExcel(
 
   worksheet.getRow(6).height = 8; // Spasi kecil
 
-  // 2. HEADER TABEL KOLOM (BARIS 7)
+  // 2. HEADER TABEL KOLOM (BARIS 7) - 21 KOLOM LENGKAP
   const columns = [
     { header: 'NO', key: 'no', width: 6 },
     { header: 'NO. KK (KARTU KELUARGA)', key: 'noKk', width: 22 },
@@ -100,6 +100,8 @@ export async function exportWargaToExcel(
     { header: 'NAMA BAPTIS (SANTO/A)', key: 'namaBaptis', width: 24 },
     { header: 'NAMA LENGKAP WARGA', key: 'namaLengkap', width: 28 },
     { header: 'L/P', key: 'jenisKelamin', width: 6 },
+    { header: 'TEMPAT LAHIR', key: 'tempatLahir', width: 18 },
+    { header: 'TANGGAL LAHIR', key: 'tanggalLahir', width: 16 },
     { header: 'HUB. KELUARGA', key: 'hubunganKeluarga', width: 16 },
     { header: 'ALAMAT DOMISILI (SEMAMPIR)', key: 'alamatDomisili', width: 34 },
     { header: 'RT/RW', key: 'rtRw', width: 14 },
@@ -133,7 +135,7 @@ export async function exportWargaToExcel(
     worksheet.getColumn(colNumber).width = col.width;
   });
 
-  // 3. PENGISIAN DATA JEMAAT (Semua Teks Huruf Kapital Sesuai Instruksi)
+  // 3. PENGISIAN DATA JEMAAT
   daftarWarga.forEach((warga, index) => {
     const rowIdx = 8 + index;
     const row = worksheet.getRow(rowIdx);
@@ -156,33 +158,35 @@ export async function exportWargaToExcel(
     row.getCell(5).value = isKatolik ? (toTitleCase(warga.namaBaptis || '') || '-') : '-'; // NAMA BAPTIS
     row.getCell(6).value = toTitleCase(warga.namaLengkap || ''); // NAMA LENGKAP
     row.getCell(7).value = warga.jenisKelamin; // L/P
-    row.getCell(8).value = toTitleCase(warga.hubunganKeluarga || '');
-    row.getCell(9).value = toTitleCase(warga.alamatDomisili || '');
-    row.getCell(10).value = warga.rtRw || '';
-    row.getCell(11).value = isKatolik ? (toTitleCase(warga.tempatBaptis || '') || '-') : '-';
-    row.getCell(12).value = isKatolik ? (toTitleCase(warga.parokiKotaBaptis || '') || '-') : '-';
-    row.getCell(13).value = tglBaptisFormatted;
-    row.getCell(14).value = isKatolik ? (warga.noSuratBaptis || '-') : '-';
-    row.getCell(15).value = isKatolik ? (warga.sakramenLain?.komuniPertama ? 'Sudah' : 'Belum') : '-';
-    row.getCell(16).value = isKatolik ? (warga.sakramenLain?.krisma ? 'Sudah' : 'Belum') : '-';
-    row.getCell(17).value = toTitleCase(warga.statusPerkawinan || '');
-    row.getCell(18).value = warga.noHpWhatsapp || '-';
-    row.getCell(19).value = warga.statusVerifikasi || 'Menunggu';
+    row.getCell(8).value = toTitleCase(warga.tempatLahir || '-'); // TEMPAT LAHIR
+    row.getCell(9).value = warga.tanggalLahir || '-'; // TANGGAL LAHIR
+    row.getCell(10).value = toTitleCase(warga.hubunganKeluarga || '');
+    row.getCell(11).value = toTitleCase(warga.alamatDomisili || '');
+    row.getCell(12).value = warga.rtRw || '';
+    row.getCell(13).value = isKatolik ? (toTitleCase(warga.tempatBaptis || '') || '-') : '-';
+    row.getCell(14).value = isKatolik ? (toTitleCase(warga.parokiKotaBaptis || '') || '-') : '-';
+    row.getCell(15).value = tglBaptisFormatted;
+    row.getCell(16).value = isKatolik ? (warga.noSuratBaptis || '-') : '-';
+    row.getCell(17).value = isKatolik ? (warga.sakramenLain?.komuniPertama ? 'Sudah' : 'Belum') : '-';
+    row.getCell(18).value = isKatolik ? (warga.sakramenLain?.krisma ? 'Sudah' : 'Belum') : '-';
+    row.getCell(19).value = toTitleCase(warga.statusPerkawinan || '');
+    row.getCell(20).value = warga.noHpWhatsapp || '-';
+    row.getCell(21).value = warga.statusVerifikasi || 'Menunggu';
 
-    // Apply borders and format on each cell (19 columns)
-    for (let c = 1; c <= 19; c++) {
+    // Apply borders and format on each cell (21 columns)
+    for (let c = 1; c <= 21; c++) {
       const cell = row.getCell(c);
       cell.border = thinBorder;
       cell.fill = rowFill;
       cell.font = { name: 'Arial', size: 9.5 };
 
       // Pastikan No KK dan NIK sebagai teks murni agar 16 digit tidak menjadi scientific notation
-      if (c === 2 || c === 3 || c === 14 || c === 18) {
+      if (c === 2 || c === 3 || c === 9 || c === 15 || c === 16 || c === 20) {
         cell.numFmt = '@'; // Text format
       }
 
       // Alignment khusus
-      if (c === 1 || c === 4 || c === 7 || c === 10 || c === 13 || c === 15 || c === 16 || c === 19) {
+      if (c === 1 || c === 4 || c === 7 || c === 9 || c === 12 || c === 15 || c === 17 || c === 18 || c === 21) {
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
       } else if (c === 2 || c === 3) {
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -217,7 +221,7 @@ export async function exportWargaToExcel(
   };
   summaryCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-  for (let c = 1; c <= 19; c++) {
+  for (let c = 1; c <= 21; c++) {
     const cell = summaryRow.getCell(c);
     cell.border = {
       top: { style: 'medium', color: { argb: 'FFEA580C' } },
@@ -253,8 +257,8 @@ export async function exportWargaToExcel(
   signTitleLeft.font = { name: 'Arial', size: 10, bold: true };
   signTitleLeft.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-  worksheet.mergeCells(`O${signRowStart}:R${signRowStart}`);
-  const signTitleRight = worksheet.getCell(`O${signRowStart}`);
+  worksheet.mergeCells(`Q${signRowStart}:T${signRowStart}`);
+  const signTitleRight = worksheet.getCell(`Q${signRowStart}`);
   signTitleRight.value = `Kediri, ${dateStr}\nSekretaris Lingkungan`;
   signTitleRight.font = { name: 'Arial', size: 10, bold: true };
   signTitleRight.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
@@ -266,8 +270,8 @@ export async function exportWargaToExcel(
   signNameLeft.font = { name: 'Arial', size: 10 };
   signNameLeft.alignment = { horizontal: 'center', vertical: 'bottom' };
 
-  worksheet.mergeCells(`O${signSpaceRow}:R${signSpaceRow}`);
-  const signNameRight = worksheet.getCell(`O${signSpaceRow}`);
+  worksheet.mergeCells(`Q${signSpaceRow}:T${signSpaceRow}`);
+  const signNameRight = worksheet.getCell(`Q${signSpaceRow}`);
   signNameRight.value = '( .................................................... )';
   signNameRight.font = { name: 'Arial', size: 10 };
   signNameRight.alignment = { horizontal: 'center', vertical: 'bottom' };

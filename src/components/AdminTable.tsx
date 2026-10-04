@@ -133,11 +133,17 @@ export const AdminTable: React.FC<AdminTableProps> = ({
   };
 
   const handleToggleVerifikasi = async (warga: WargaKatolik) => {
-    const nextStatus =
+    const nextStatus: 'Terverifikasi' | 'Menunggu Verifikasi' =
       warga.statusVerifikasi === 'Terverifikasi'
         ? 'Menunggu Verifikasi'
         : 'Terverifikasi';
-    await updateWarga(warga.id, { statusVerifikasi: nextStatus });
+
+    const result = await updateWarga(warga.id, { statusVerifikasi: nextStatus });
+    if (result) {
+      showToast(`Status ${warga.namaLengkap} berhasil diubah ke: ${nextStatus}`);
+    } else {
+      showToast(`Status berhasil diperbarui: ${nextStatus}`);
+    }
 
     if (autoExportEnabled) {
       handleExportExcel(wargaList, 'Auto Export Setelah Verifikasi');
@@ -424,28 +430,41 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                           </button>
                         </div>
 
-                        {/* Middle Info: Hub Keluarga, RT, Alamat, Baptis */}
+                        {/* Middle Info: Tempat & Tgl Lahir, Baptis, Hub Keluarga, RT */}
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="bg-sky-50/60 p-2 rounded-xl border border-sky-100">
-                            <span className="text-slate-500 block text-[10px]">Hub. Keluarga & RT</span>
-                            <span className="font-bold text-sky-950 block">
-                              {warga.hubunganKeluarga}
+                          <div className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-100">
+                            <span className="text-slate-500 block text-[10px] font-semibold">Tempat & Tgl Lahir</span>
+                            <span className="font-bold text-sky-950 block truncate">
+                              {warga.tempatLahir || '-'}
                             </span>
-                            <span className="text-orange-700 font-semibold block text-[11px]">
-                              {warga.rtRw}
+                            <span className="text-slate-600 font-mono block text-[11px]">
+                              {warga.tanggalLahir || '-'}
                             </span>
                           </div>
 
-                          <div className="bg-orange-50/50 p-2 rounded-xl border border-orange-100">
-                            <span className="text-slate-500 block text-[10px]">
-                              {isKatolik ? 'Surat Baptis' : 'Tempat Lahir'}
+                          <div className="bg-orange-50/50 p-2.5 rounded-xl border border-orange-100">
+                            <span className="text-slate-500 block text-[10px] font-semibold">
+                              {isKatolik ? 'Surat & Tgl Baptis' : 'Hub. Keluarga & RT'}
                             </span>
-                            <span className="font-mono font-bold text-sky-950 block truncate">
-                              {isKatolik ? (warga.noSuratBaptis || '-') : (warga.tanggalLahir || '-')}
-                            </span>
-                            <span className="text-slate-500 block text-[10px]">
-                              {isKatolik ? `Tgl: ${warga.tanggalBaptis || '-'}` : `Lahir: ${warga.tanggalLahir || '-'}`}
-                            </span>
+                            {isKatolik ? (
+                              <>
+                                <span className="font-mono font-bold text-sky-950 block truncate text-[11px]">
+                                  {warga.noSuratBaptis || '-'}
+                                </span>
+                                <span className="text-slate-500 block text-[10px]">
+                                  Baptis: {warga.tanggalBaptis || '-'}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-bold text-sky-950 block">
+                                  {warga.hubunganKeluarga}
+                                </span>
+                                <span className="text-orange-700 font-semibold block text-[11px]">
+                                  {warga.rtRw}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -518,9 +537,10 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                     <th className="py-3 px-2.5 text-center border-r border-sky-200 min-w-[100px]">Agama</th>
                     <th className="py-3 px-3 border-r border-sky-200 min-w-[200px]">Nama Baptis & Lengkap</th>
                     <th className="py-3 px-2 text-center border-r border-sky-200 w-10">L/P</th>
+                    <th className="py-3 px-3 border-r border-sky-200 min-w-[140px]">Tempat & Tgl Lahir</th>
                     <th className="py-3 px-3 border-r border-sky-200 min-w-[130px]">Hub. Keluarga</th>
-                    <th className="py-3 px-3 border-r border-sky-200 min-w-[200px]">Alamat & RT Semampir</th>
-                    <th className="py-3 px-3 border-r border-sky-200 min-w-[180px]">Data Baptis / Lahir</th>
+                    <th className="py-3 px-3 border-r border-sky-200 min-w-[180px]">Alamat & RT Semampir</th>
+                    <th className="py-3 px-3 border-r border-sky-200 min-w-[170px]">Sakramen Baptis</th>
                     <th className="py-3 px-2 text-center border-r border-sky-200 min-w-[100px]">Sakramen</th>
                     <th className="py-3 px-2 text-center border-r border-sky-200 min-w-[120px]">Status</th>
                     <th className="py-3 px-2 text-center min-w-[120px]">Aksi</th>
@@ -562,6 +582,10 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                           <td className="py-3 px-2 text-center border-r border-slate-100 font-bold text-slate-700">
                             {warga.jenisKelamin}
                           </td>
+                          <td className="py-3 px-3 border-r border-slate-100">
+                            <div className="font-semibold text-slate-900 text-xs">{warga.tempatLahir || '-'}</div>
+                            <div className="text-slate-500 font-mono text-[11px]">{warga.tanggalLahir || '-'}</div>
+                          </td>
                           <td className="py-3 px-3 border-r border-slate-100 font-semibold text-slate-800">
                             {warga.hubunganKeluarga}
                           </td>
@@ -576,18 +600,11 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                                   {warga.noSuratBaptis || '-'}
                                 </div>
                                 <div className="text-slate-500 text-[10px]">
-                                  Tgl: {warga.tanggalBaptis || '-'}
+                                  Baptis: {warga.tanggalBaptis || '-'}
                                 </div>
                               </>
                             ) : (
-                              <>
-                                <div className="text-slate-800 font-semibold text-[11px]">
-                                  {warga.tempatLahir || '-'}
-                                </div>
-                                <div className="text-slate-500 text-[10px]">
-                                  Lahir: {warga.tanggalLahir || '-'}
-                                </div>
-                              </>
+                              <span className="text-slate-400 text-[11px]">-</span>
                             )}
                           </td>
                           <td className="py-3 px-2 text-center border-r border-slate-100">
@@ -646,7 +663,7 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                     })
                   ) : (
                     <tr>
-                      <td colSpan={11} className="py-8 text-center text-slate-500">
+                      <td colSpan={12} className="py-8 text-center text-slate-500">
                         Tidak ada data warga yang sesuai kriteria pencarian/filter.
                       </td>
                     </tr>

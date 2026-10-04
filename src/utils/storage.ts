@@ -179,33 +179,50 @@ export async function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdA
 
 /**
  * Perbarui data warga
+ * Mengirim pembaruan langsung ke database server pusat dan memperbarui state lokal
  */
 export async function updateWarga(id: string, updatedFields: Partial<WargaKatolik>): Promise<WargaKatolik | null> {
-  const list = getStoredWarga();
-  const index = list.findIndex((w) => w.id === id);
-  if (index === -1) return null;
+  let updatedRecord: WargaKatolik | null = null;
 
-  const updated: WargaKatolik = {
-    ...list[index],
-    ...updatedFields,
-    updatedAt: new Date().toISOString(),
-  };
-
+  // 1. Kirim pembaruan ke database server pusat terlebih dahulu
   try {
-    await fetch(`/api/warga/${encodeURIComponent(id)}`, {
+    const res = await fetch(`/api/warga/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-      body: JSON.stringify(updated),
+      body: JSON.stringify(updatedFields),
     });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data) {
+        updatedRecord = json.data;
+        console.log(`[SAPA Sync] Data ${id} berhasil diperbarui di server:`, updatedFields);
+      }
+    }
   } catch (err) {
-    console.error('Gagal update di server:', err);
+    console.error('[SAPA Sync] Gagal update di server:', err);
   }
 
-  list[index] = updated;
-  saveStoredWarga(list);
+  // 2. Perbarui data lokal
+  const list = getStoredWarga();
+  const index = list.findIndex((w) => w.id === id);
+
+  if (index !== -1) {
+    list[index] = {
+      ...list[index],
+      ...updatedFields,
+      updatedAt: new Date().toISOString(),
+    };
+    if (!updatedRecord) updatedRecord = list[index];
+    saveStoredWarga(list);
+  } else if (updatedRecord) {
+    saveStoredWarga([updatedRecord, ...list]);
+  }
+
+  // 3. Tarik data terbaru dari server
   await syncWithServer(true);
 
-  return updated;
+  return updatedRecord;
 }
 
 /**
