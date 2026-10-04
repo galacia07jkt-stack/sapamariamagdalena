@@ -58,119 +58,89 @@ export function saveStoredWarga(data: WargaKatolik[]): void {
 
 /**
  * Sinkronisasi data dengan Server Database Pusat (/api/warga)
- * Dipanggil secara berkala (real-time polling setiap 3.5 detik) agar:
- * Saat warga mengisi dari HP / laptop lain, admin langsung melihat data masuk secara real-time!
- * Melindungi dari kehilangan data jika server sempat restart/fresh.
+ * Server bertindak sebagai SINGLE SOURCE OF TRUTH (Pusat Kebenaran Mutlak):
+ * - Saat warga mengisi dari HP mana pun, data masuk ke server.
+ * - Saat admin atau warga menarik data / polling, server mengirimkan data resmi.
+ * - Saat data dihapus di server, data langsung hilang permanen dan TIDAK AKAN PERNAH muncul kembali!
  */
-export async function syncWithServer(): Promise<WargaKatolik[]> {
+export async function syncWithServer(force = false): Promise<WargaKatolik[]> {
   try {
-    const localRaw = localStorage.getItem(STORAGE_KEY);
-    const localData: WargaKatolik[] = localRaw ? JSON.parse(localRaw) : [];
+    const res = await fetch(`/api/warga?t=${Date.now()}`, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
 
-    const res = await fetch('/api/warga');
     if (res.ok) {
       const json = await res.json();
       if (json && Array.isArray(json.data)) {
         const serverData: WargaKatolik[] = json.data;
 
-        // Jika data di server masih kosong tapi di perangkat lokal sudah ada data yang pernah diinput,
-        // sinkronkan data lokal naik ke server agar tidak hilang saat server restart.
-        if (localData.length > 0 && serverData.length === 0) {
-          fetch('/api/warga/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ list: localData }),
-          }).catch(() => {});
-          return localData;
-        }
+        const localRaw = localStorage.getItem(STORAGE_KEY);
+        const localData: WargaKatolik[] = localRaw ? JSON.parse(localRaw) : [];
 
-        // Penggabungan (Merge) data server dan lokal berdasarkan ID unik jemaat
-        const mergedMap = new Map<string, WargaKatolik>();
-        serverData.forEach((item) => mergedMap.set(item.id, item));
-
-        // Jika ada data di lokal yang belum sempat terkirim ke server, pertahankan dan kirim
-        const unpushed: WargaKatolik[] = [];
-        localData.forEach((item) => {
-          if (!mergedMap.has(item.id)) {
-            mergedMap.set(item.id, item);
-            unpushed.push(item);
-          }
-        });
-
-        if (unpushed.length > 0) {
-          unpushed.forEach((item) => {
-            fetch('/api/warga', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(item),
-            }).catch(() => {});
-          });
-        }
-
-        const mergedList = Array.from(mergedMap.values());
-        // Urutkan dari data terbaru
-        mergedList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-
-        const isDifferent = JSON.stringify(mergedList) !== JSON.stringify(localData);
-        if (isDifferent) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedList));
+        // Bandingkan apakah isi data berubah atau dipaksa refresh
+        const isDifferent = JSON.stringify(serverData) !== JSON.stringify(localData);
+        if (isDifferent || force) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
           localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
-          window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: mergedList }));
+          window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: serverData }));
         }
-        return mergedList;
+        return serverData;
       }
     }
   } catch (err) {
-    // Jika koneksi terputus atau offline, tetap gunakan cache lokal
+    console.warn('[SAPA Sync] Gagal koneksi ke server, menggunakan data lokal cache:', err);
   }
   return getStoredWarga();
 }
 
 /**
  * Mengosongkan seluruh data jemaat / data demo secara permanen (Otoritas Admin)
- * Menghapus baik di localStorage maupun di server backend pusat!
+ * Menghapus baik di server backend pusat maupun di cache lokal!
  */
-export function kosongkanSemuaWarga(): void {
+export async function kosongkanSemuaWarga(): Promise<void> {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-    localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
-    window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: [] }));
-
-    // Hapus di server pusat
-    fetch('/api/warga', {
+    const res = await fetch('/api/warga', {
       method: 'DELETE',
-    }).catch((err) => console.error('Gagal hapus database di server:', err));
+      headers: { 'Cache-Control': 'no-store' },
+    });
+    if (res.ok) {
+      console.log('[SAPA Sync] Database di server berhasil dikosongkan.');
+    }
   } catch (err) {
-    console.error('Gagal mengosongkan database:', err);
+    console.error('Gagal hapus database di server:', err);
   }
+
+  saveStoredWarga([]);
+  localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
+  window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: [] }));
 }
 
 /**
  * Memuat kembali data contoh/demo bawaan untuk keperluan uji coba
  */
-export function resetKeDataDemo(): void {
+export async function resetKeDataDemo(): Promise<void> {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_WARGA_DATA));
-    localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
-    window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: INITIAL_WARGA_DATA }));
-
-    // Kirim sinkronisasi ke server
-    fetch('/api/warga/sync', {
+    await fetch('/api/warga/sync', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
       body: JSON.stringify({ list: INITIAL_WARGA_DATA }),
-    }).catch((err) => console.error('Gagal kirim reset demo ke server:', err));
+    });
   } catch (err) {
-    console.error('Gagal memuat ulang data demo:', err);
+    console.error('Gagal kirim reset demo ke server:', err);
   }
+
+  saveStoredWarga(INITIAL_WARGA_DATA);
+  await syncWithServer(true);
 }
 
 /**
- * Tambah warga baru (dari formulir mandiri warga atau admin)
- * Langsung disimpan ke cache lokal DAN dikirim ke server pusat secara real-time!
+ * Tambah warga baru (dari formulir mandiri HP umat atau laptop admin)
+ * Wajib menunggu respon dari server pusat (AWAIT) agar data pasti tersimpan di database server!
  */
-export function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdAt' | 'updatedAt'>): WargaKatolik {
-  const list = getStoredWarga();
+export async function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdAt' | 'updatedAt'>): Promise<WargaKatolik> {
   const now = new Date().toISOString();
   const newWarga: WargaKatolik = {
     ...wargaData,
@@ -179,22 +149,30 @@ export function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdAt' | '
     updatedAt: now,
   };
 
-  const updatedList = [newWarga, ...list];
-  saveStoredWarga(updatedList);
-
-  // Kirim secara langsung ke server pusat agar admin dan pengguna lain langsung melihatnya
-  fetch('/api/warga', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(newWarga),
-  })
-    .then((res) => res.json())
-    .then((json) => {
-      console.log('[SAPA Sync] Data berhasil tersimpan di server:', json);
-    })
-    .catch((err) => {
-      console.error('[SAPA Sync] Gagal kirim ke server:', err);
+  // 1. Simpan langsung ke server backend pusat dan tunggu konfirmasi
+  try {
+    const res = await fetch('/api/warga', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store'
+      },
+      body: JSON.stringify(newWarga),
     });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || 'Server menolak penyimpanan data.');
+    }
+
+    console.log('[SAPA Sync] Berhasil disimpan di database pusat:', newWarga.namaLengkap);
+  } catch (err) {
+    console.error('[SAPA Sync] Gagal kirim ke server pusat:', err);
+    throw err;
+  }
+
+  // 2. Tarik data terbaru dari server agar sinkron
+  await syncWithServer(true);
 
   return newWarga;
 }
@@ -202,7 +180,7 @@ export function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdAt' | '
 /**
  * Perbarui data warga
  */
-export function updateWarga(id: string, updatedFields: Partial<WargaKatolik>): WargaKatolik | null {
+export async function updateWarga(id: string, updatedFields: Partial<WargaKatolik>): Promise<WargaKatolik | null> {
   const list = getStoredWarga();
   const index = list.findIndex((w) => w.id === id);
   if (index === -1) return null;
@@ -213,32 +191,44 @@ export function updateWarga(id: string, updatedFields: Partial<WargaKatolik>): W
     updatedAt: new Date().toISOString(),
   };
 
+  try {
+    await fetch(`/api/warga/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      body: JSON.stringify(updated),
+    });
+  } catch (err) {
+    console.error('Gagal update di server:', err);
+  }
+
   list[index] = updated;
   saveStoredWarga(list);
-
-  // Kirim pembaruan ke server
-  fetch(`/api/warga/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updated),
-  }).catch((err) => console.error('Gagal update di server:', err));
+  await syncWithServer(true);
 
   return updated;
 }
 
 /**
  * Hapus data warga secara permanen
+ * Menghapus dari server pusat terlebih dahulu agar saat perangkat lain refresh/tarik data, data tidak muncul lagi!
  */
-export function hapusWarga(id: string): boolean {
+export async function hapusWarga(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/warga/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'Cache-Control': 'no-store' },
+    });
+    if (res.ok) {
+      console.log(`[SAPA Sync] Data ${id} berhasil dihapus dari server pusat.`);
+    }
+  } catch (err) {
+    console.error('Gagal hapus di server:', err);
+  }
+
   const list = getStoredWarga();
   const filtered = list.filter((w) => w.id !== id);
-  if (filtered.length === list.length) return false;
   saveStoredWarga(filtered);
-
-  // Hapus di server
-  fetch(`/api/warga/${id}`, {
-    method: 'DELETE',
-  }).catch((err) => console.error('Gagal hapus di server:', err));
+  await syncWithServer(true);
 
   return true;
 }

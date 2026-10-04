@@ -49,14 +49,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ stats, wargaList
     setCurrentTemp(newTemp);
   };
 
-  const handleClearAll = () => {
-    kosongkanSemuaWarga();
+  const handleClearAll = async () => {
+    await kosongkanSemuaWarga();
     setClearConfirmOpen(false);
     showToast('Database berhasil dikosongkan (0 data).');
   };
 
-  const handleResetDemo = () => {
-    resetKeDataDemo();
+  const handleResetDemo = async () => {
+    await resetKeDataDemo();
     showToast('Data demo jemaat berhasil dimuat ulang.');
   };
 

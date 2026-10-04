@@ -108,7 +108,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
     setFormData((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -175,7 +175,7 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
       const padRw = formData.rw.padStart(2, '0');
       const finalRtRw = `RT ${padRt} / RW ${padRw}`;
 
-      const created = tambahWarga({
+      const created = await tambahWarga({
         noKk: cleanKk,
         nik: cleanNik,
         namaLengkap: toTitleCase(formData.namaLengkap.trim()),
@@ -258,9 +258,12 @@ export const FormInputWarga: React.FC<FormInputWargaProps> = ({ onSuccess }) => 
           catatanKhusus: '',
         });
       }
-    } catch (err) {
-      console.error(err);
-      setErrorMsg('Terjadi kendala saat menyimpan data jemaat. Silakan coba lagi.');
+    } catch (err: any) {
+      console.error('[Form Submit Error]:', err);
+      setErrorMsg(
+        err?.message ||
+        'Gagal menyimpan ke server pusat. Mohon periksa koneksi internet HP/Laptop Anda dan coba lagi.'
+      );
     } finally {
       setSubmitting(false);
     }

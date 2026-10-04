@@ -23,7 +23,8 @@ import {
   Phone, 
   FileSpreadsheet, 
   CheckCircle2,
-  Wifi
+  Wifi,
+  RefreshCw
 } from 'lucide-react';
 
 export default function App() {
@@ -63,6 +64,7 @@ export default function App() {
     const pollingInterval = setInterval(() => {
       syncWithServer()
         .then((data) => {
+          setWargaList(data);
           setIsServerOnline(true);
         })
         .catch(() => {
@@ -73,12 +75,12 @@ export default function App() {
     // 3. Listener perubahan saat tab/layar diaktifkan kembali
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        syncWithServer();
+        syncWithServer().then((data) => setWargaList(data));
       }
     };
 
     const handleFocus = () => {
-      syncWithServer();
+      syncWithServer().then((data) => setWargaList(data));
     };
 
     const handleUpdate = () => {
@@ -167,9 +169,9 @@ export default function App() {
         
         {/* Status Indikator Sinkronisasi Server Pusat untuk Admin */}
         {isAdmin && activeTab === 'admin' && (
-          <div className="mb-4 px-3.5 py-2 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between text-xs text-emerald-900">
+          <div className="mb-4 px-3.5 py-2.5 bg-emerald-50 border border-emerald-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-900 shadow-2xs">
             <div className="flex items-center gap-2 font-medium">
-              <span className="relative flex h-2.5 w-2.5">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
@@ -177,9 +179,21 @@ export default function App() {
                 <strong>Database Server Pusat Aktif:</strong> Terkoneksi & tersinkronisasi real-time dengan seluruh HP/Laptop warga yang input data.
               </span>
             </div>
-            <div className="hidden sm:flex items-center gap-1 font-mono text-[11px] text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
-              <Wifi className="w-3.5 h-3.5" />
-              <span>Real-Time Polling 3.5s</span>
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <button
+                onClick={() => {
+                  syncWithServer(true).then((data) => setWargaList(data));
+                }}
+                className="flex items-center gap-1.5 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+                title="Tarik pembaruan data dari server sekarang"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Tarik Data</span>
+              </button>
+              <div className="hidden sm:flex items-center gap-1 font-mono text-[11px] text-emerald-700 bg-emerald-100/70 px-2 py-1 rounded-md">
+                <Wifi className="w-3.5 h-3.5" />
+                <span>Polling 3.5s</span>
+              </div>
             </div>
           </div>
         )}

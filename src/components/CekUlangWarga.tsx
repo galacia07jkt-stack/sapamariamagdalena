@@ -12,7 +12,7 @@ import {
   Phone
 } from 'lucide-react';
 import { WargaKatolik } from '../types';
-import { cariWargaOlehNikAtauKk } from '../utils/storage';
+import { cariWargaOlehNikAtauKk, syncWithServer } from '../utils/storage';
 import { maskSensitiveId } from '../utils/encryption';
 import { SapaLogo } from './SapaLogo';
 
@@ -28,14 +28,22 @@ export const CekUlangWarga: React.FC<CekUlangWargaProps> = ({
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<WargaKatolik[] | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!keyword.trim()) return;
 
-    const data = cariWargaOlehNikAtauKk(keyword);
-    setResults(data);
-    setHasSearched(true);
+    try {
+      setIsSearching(true);
+      // Tarik data terbaru dari server pusat agar umat yang baru input dari HP lain langsung terlacak
+      await syncWithServer();
+      const data = cariWargaOlehNikAtauKk(keyword);
+      setResults(data);
+      setHasSearched(true);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleClear = () => {
@@ -78,10 +86,11 @@ export const CekUlangWarga: React.FC<CekUlangWargaProps> = ({
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="flex-1 sm:flex-none px-7 py-3.5 sm:py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-base rounded-2xl shadow-md active:scale-98 transition-all flex items-center justify-center gap-2 border-2 border-orange-600 shrink-0 min-h-[52px] sm:min-h-[56px] cursor-pointer"
+                disabled={isSearching}
+                className="flex-1 sm:flex-none px-7 py-3.5 sm:py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-base rounded-2xl shadow-md active:scale-98 transition-all flex items-center justify-center gap-2 border-2 border-orange-600 shrink-0 min-h-[52px] sm:min-h-[56px] cursor-pointer disabled:opacity-50"
               >
                 <Search className="w-5 h-5" />
-                <span>Cari Data</span>
+                <span>{isSearching ? 'Mencari...' : 'Cari Data'}</span>
               </button>
 
               {hasSearched && (

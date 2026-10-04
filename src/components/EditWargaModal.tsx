@@ -90,7 +90,7 @@ export const EditWargaModal: React.FC<EditWargaModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -127,7 +127,7 @@ export const EditWargaModal: React.FC<EditWargaModalProps> = ({
 
     const finalRtRw = formatRtRw(form.rt, form.rw);
 
-    const updated = updateWarga(form.id, {
+    const updated = await updateWarga(form.id, {
       ...form,
       noKk: cleanKk,
       nik: cleanNik,

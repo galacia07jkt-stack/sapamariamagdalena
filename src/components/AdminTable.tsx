@@ -12,11 +12,12 @@ import {
   List,
   RotateCcw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { WargaKatolik, AgamaType } from '../types';
 import { exportWargaToExcel } from '../utils/excelExport';
-import { hapusWarga, updateWarga, kosongkanSemuaWarga, resetKeDataDemo } from '../utils/storage';
+import { hapusWarga, updateWarga, kosongkanSemuaWarga, resetKeDataDemo, syncWithServer } from '../utils/storage';
 import { SapaLogo } from './SapaLogo';
 
 interface AdminTableProps {
@@ -43,6 +44,7 @@ export const AdminTable: React.FC<AdminTableProps> = ({
   const [autoExportEnabled, setAutoExportEnabled] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const agamaList: AgamaType[] = [
     'Katolik',
@@ -118,34 +120,46 @@ export const AdminTable: React.FC<AdminTableProps> = ({
     }
   };
 
-  const handleToggleVerifikasi = (warga: WargaKatolik) => {
+  const handleManualRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      const data = await syncWithServer(true);
+      showToast(`Berhasil menarik data terbaru dari server: ${data.length} warga tercatat.`);
+    } catch (err) {
+      showToast('Gagal menarik data dari server pusat. Silakan periksa koneksi internet.');
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
+
+  const handleToggleVerifikasi = async (warga: WargaKatolik) => {
     const nextStatus =
       warga.statusVerifikasi === 'Terverifikasi'
         ? 'Menunggu Verifikasi'
         : 'Terverifikasi';
-    updateWarga(warga.id, { statusVerifikasi: nextStatus });
+    await updateWarga(warga.id, { statusVerifikasi: nextStatus });
 
     if (autoExportEnabled) {
       handleExportExcel(wargaList, 'Auto Export Setelah Verifikasi');
     }
   };
 
-  const handleDelete = (id: string) => {
-    const success = hapusWarga(id);
+  const handleDelete = async (id: string) => {
+    const success = await hapusWarga(id);
     setDeleteConfirmId(null);
     if (success) {
-      showToast('1 Data jemaat berhasil dihapus secara bersih.');
+      showToast('1 Data jemaat berhasil dihapus permanen dari server.');
     }
   };
 
-  const handleKosongkanSemua = () => {
-    kosongkanSemuaWarga();
+  const handleKosongkanSemua = async () => {
+    await kosongkanSemuaWarga();
     setClearAllModalOpen(false);
     showToast('Seluruh data demo/jemaat telah berhasil dibersihkan (Database: 0 data).');
   };
 
-  const handleResetDemo = () => {
-    resetKeDataDemo();
+  const handleResetDemo = async () => {
+    await resetKeDataDemo();
     showToast('Data contoh demo (10 jemaat) berhasil dimuat ulang.');
   };
 
@@ -166,8 +180,19 @@ export const AdminTable: React.FC<AdminTableProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons: Add Warga, Export Excel, Kosongkan Data / Reset Demo */}
+        {/* Action Buttons: Tarik Data, Add Warga, Export Excel, Kosongkan Data / Reset Demo */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Tombol Refresh / Tarik Data dari Server */}
+          <button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="flex-1 md:flex-none px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs border border-amber-400 flex items-center justify-center gap-1.5 transition min-h-[44px] cursor-pointer disabled:opacity-70"
+            title="Tarik & perbarui data terbaru dari server pusat (sinkronisasi antar HP/Laptop)"
+          >
+            <RefreshCw className={`w-4 h-4 text-amber-100 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Menarik Data...' : 'Tarik Data Server'}</span>
+          </button>
+
           <button
             onClick={onAddNew}
             className="flex-1 md:flex-none px-3.5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs border border-sky-400 flex items-center justify-center gap-1.5 transition min-h-[44px]"
