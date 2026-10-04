@@ -94,8 +94,8 @@ export const EditWargaModal: React.FC<EditWargaModalProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
-    const cleanKk = form.noKk.replace(/\D/g, '');
-    const cleanNik = form.nik.replace(/\D/g, '');
+    const cleanKk = String(form.noKk || '').replace(/\D/g, '');
+    const cleanNik = String(form.nik || '').replace(/\D/g, '');
 
     if (cleanKk.length !== 16) {
       setErrorMsg('Nomor KK harus 16 digit angka.');
@@ -106,11 +106,11 @@ export const EditWargaModal: React.FC<EditWargaModalProps> = ({
       return;
     }
 
-    if (!form.rt.trim()) {
+    if (!String(form.rt || '').trim()) {
       setErrorMsg('Nomor RT wajib diisi.');
       return;
     }
-    if (!form.rw.trim()) {
+    if (!String(form.rw || '').trim()) {
       setErrorMsg('Nomor RW wajib diisi.');
       return;
     }
@@ -131,15 +131,15 @@ export const EditWargaModal: React.FC<EditWargaModalProps> = ({
       ...form,
       noKk: cleanKk,
       nik: cleanNik,
-      namaLengkap: toTitleCase(form.namaLengkap.trim()),
-      namaBaptis: isKatolik ? toTitleCase((form.namaBaptis || '').trim()) : '',
-      alamatDomisili: toTitleCase(form.alamatDomisili.trim()),
+      namaLengkap: toTitleCase(String(form.namaLengkap || '').trim()),
+      namaBaptis: isKatolik ? toTitleCase(String(form.namaBaptis || '').trim()) : '',
+      alamatDomisili: toTitleCase(String(form.alamatDomisili || '').trim()),
       rtRw: finalRtRw,
-      tempatLahir: toTitleCase((form.tempatLahir || '').trim()),
-      tempatBaptis: isKatolik ? toTitleCase((form.tempatBaptis || '').trim()) : undefined,
-      parokiKotaBaptis: isKatolik ? toTitleCase((form.parokiKotaBaptis || '').trim()) : undefined,
-      pekerjaan: toTitleCase((form.pekerjaan || '').trim()),
-      catatanKhusus: toTitleCase((form.catatanKhusus || '').trim()),
+      tempatLahir: toTitleCase(String(form.tempatLahir || '').trim()),
+      tempatBaptis: isKatolik ? toTitleCase(String(form.tempatBaptis || '').trim()) : undefined,
+      parokiKotaBaptis: isKatolik ? toTitleCase(String(form.parokiKotaBaptis || '').trim()) : undefined,
+      pekerjaan: toTitleCase(String(form.pekerjaan || '').trim()),
+      catatanKhusus: toTitleCase(String(form.catatanKhusus || '').trim()),
     });
 
     if (updated) {

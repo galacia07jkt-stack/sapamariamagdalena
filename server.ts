@@ -98,7 +98,7 @@ async function startServer() {
         updatedAt: new Date().toISOString()
       };
     } else {
-      current.unshift(warga);
+      current.push(warga);
     }
 
     writeDb(current);

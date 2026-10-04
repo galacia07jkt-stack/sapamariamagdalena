@@ -1,16 +1,21 @@
 import ExcelJS from 'exceljs';
 import { WargaKatolik } from '../types';
 import { toTitleCase } from './textUtils';
+import { urutkanWargaSusunanKeluarga } from './familySort';
 
 /**
  * Utility untuk mengekspor data jemaat ke file Excel (.xlsx)
- * dengan border rapi, kolom agama, styling warna biru muda & oranye khas paroki,
+ * dengan susunan resmi Kartu Keluarga (Kepala Keluarga -> Istri -> Anak -> Famili Lain),
+ * border rapi, kolom agama, styling warna biru muda & oranye khas paroki,
  * serta format teks agar NIK dan No KK tidak terpotong.
  */
 export async function exportWargaToExcel(
   daftarWarga: WargaKatolik[],
   customTitle?: string
 ): Promise<void> {
+  // Susun data jemaat: Kepala Keluarga terlebih dahulu, lalu Istri, Anak, dst (per Kartu Keluarga)
+  const dataTerurut = urutkanWargaSusunanKeluarga(daftarWarga);
+
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'SAPA Paroki St. Vincentius a Paulo Kediri';
   workbook.created = new Date();
@@ -136,19 +141,31 @@ export async function exportWargaToExcel(
   });
 
   // 3. PENGISIAN DATA JEMAAT
-  daftarWarga.forEach((warga, index) => {
+  // Kelompokkan zebra striping per keluarga agar 1 keluarga terlihat rapi dan bersatu
+  let currentFamilyIdx = 0;
+  let lastKk = '';
+
+  dataTerurut.forEach((warga, index) => {
+    const kk = warga.noKk ? String(warga.noKk).trim() : String(warga.id || index);
+    if (index > 0 && kk !== lastKk) {
+      currentFamilyIdx++;
+    }
+    const isNewFamilyStart = index > 0 && kk !== lastKk;
+    lastKk = kk;
+
     const rowIdx = 8 + index;
     const row = worksheet.getRow(rowIdx);
     row.height = 24;
 
-    const isZebra = index % 2 === 1;
+    const isZebra = currentFamilyIdx % 2 === 1;
     const rowFill: ExcelJS.Fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: isZebra ? 'FFF0F9FF' : 'FFFFFFFF' },
+      fgColor: { argb: isZebra ? 'FFF8FAFC' : 'FFFFFFFF' },
     };
 
     const isKatolik = (warga.agama || 'Katolik') === 'Katolik';
+    const isKepalaKeluarga = String(warga.hubunganKeluarga || '').toLowerCase().trim() === 'kepala keluarga';
     const tglBaptisFormatted = isKatolik && warga.tanggalBaptis ? warga.tanggalBaptis : '-';
 
     row.getCell(1).value = index + 1; // NO
@@ -176,7 +193,15 @@ export async function exportWargaToExcel(
     // Apply borders and format on each cell (21 columns)
     for (let c = 1; c <= 21; c++) {
       const cell = row.getCell(c);
-      cell.border = thinBorder;
+      cell.border = isNewFamilyStart
+        ? {
+            top: { style: 'medium', color: { argb: 'FFCBD5E1' } },
+            left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            right: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          }
+        : thinBorder;
+
       cell.fill = rowFill;
       cell.font = { name: 'Arial', size: 9.5 };
 
@@ -194,18 +219,24 @@ export async function exportWargaToExcel(
         cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
       }
 
+      // Berikan penekanan visual untuk Kepala Keluarga
+      if (isKepalaKeluarga) {
+        if (c === 6) {
+          cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+        } else if (c === 10) {
+          cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: 'FF0369A1' } };
+        }
+      }
+
       // Berikan warna oranye pada nama baptis agar estetik
       if (c === 5) {
         cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: 'FFC2410C' } };
-      }
-      if (c === 6) {
-        cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
       }
     }
   });
 
   // 4. TOTAL REKAP ROW DI BAWAH DATA
-  const lastDataRow = 7 + daftarWarga.length;
+  const lastDataRow = 7 + dataTerurut.length;
   const summaryRowIdx = lastDataRow + 1;
   const summaryRow = worksheet.getRow(summaryRowIdx);
   summaryRow.height = 26;

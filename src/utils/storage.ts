@@ -261,10 +261,10 @@ export function cariWargaByNikAtauKk(keyword: string): WargaKatolik[] {
   const list = getStoredWarga();
   return list.filter((warga) => {
     return (
-      warga.nik.toLowerCase().includes(cleanKeyword) ||
-      warga.noKk.toLowerCase().includes(cleanKeyword) ||
-      warga.namaLengkap.toLowerCase().includes(cleanKeyword) ||
-      warga.namaBaptis.toLowerCase().includes(cleanKeyword)
+      (warga.nik && warga.nik.toLowerCase().includes(cleanKeyword)) ||
+      (warga.noKk && warga.noKk.toLowerCase().includes(cleanKeyword)) ||
+      (warga.namaLengkap && warga.namaLengkap.toLowerCase().includes(cleanKeyword)) ||
+      (warga.namaBaptis && warga.namaBaptis.toLowerCase().includes(cleanKeyword))
     );
   });
 }
@@ -329,10 +329,14 @@ export function hitungStatistikParoki(list: WargaKatolik[]): StatistikParoki {
 
     // Usia
     let usia = 30; // default jika tanggal lahir tidak diisi
-    if (w.tanggalLahir) {
-      const birthYear = parseInt(w.tanggalLahir.split('-')[0] || w.tanggalLahir.split('/')[2] || '1995', 10);
-      if (!isNaN(birthYear)) {
-        usia = Math.max(0, currentYear - birthYear);
+    if (w.tanggalLahir && typeof w.tanggalLahir === 'string') {
+      const parts = w.tanggalLahir.includes('/') ? w.tanggalLahir.split('/') : w.tanggalLahir.split('-');
+      if (parts.length === 3) {
+        const yearPart = parts[0].length === 4 ? parts[0] : parts[2];
+        const birthYear = parseInt(yearPart, 10);
+        if (!isNaN(birthYear)) {
+          usia = Math.max(0, currentYear - birthYear);
+        }
       }
     }
 

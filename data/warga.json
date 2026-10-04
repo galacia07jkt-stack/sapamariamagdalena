@@ -1,1 +1,58 @@
-[]
+[
+  {
+    "id": "sapa-test-kk",
+    "noKk": "3571020101900001",
+    "nik": "3571021405820001",
+    "namaLengkap": "BAMBANG TRIANTO",
+    "hubunganKeluarga": "Kepala Keluarga",
+    "jenisKelamin": "L",
+    "tempatLahir": "Kediri",
+    "tanggalLahir": "14/05/1982",
+    "alamatDomisili": "Semampir",
+    "rtRw": "RT 02 / RW 01",
+    "agama": "Katolik",
+    "statusVerifikasi": "Terverifikasi"
+  },
+  {
+    "id": "sapa-test-istri",
+    "noKk": "3571020101900001",
+    "nik": "3571025509850002",
+    "namaLengkap": "MARIA WAHYUNINGSIH",
+    "hubunganKeluarga": "Istri",
+    "jenisKelamin": "P",
+    "tempatLahir": "Kediri",
+    "tanggalLahir": "15/09/1985",
+    "alamatDomisili": "Semampir",
+    "rtRw": "RT 02 / RW 01",
+    "agama": "Katolik",
+    "statusVerifikasi": "Terverifikasi"
+  },
+  {
+    "id": "sapa-test-anak1",
+    "noKk": "3571020101900001",
+    "nik": "3571021203120003",
+    "namaLengkap": "ANTONIUS KEVIN",
+    "hubunganKeluarga": "Anak",
+    "jenisKelamin": "L",
+    "tempatLahir": "Kediri",
+    "tanggalLahir": "12/03/2012",
+    "alamatDomisili": "Semampir",
+    "rtRw": "RT 02 / RW 01",
+    "agama": "Katolik",
+    "statusVerifikasi": "Terverifikasi"
+  },
+  {
+    "id": "sapa-test-anak2",
+    "noKk": "3571020101900001",
+    "nik": "3571022008160004",
+    "namaLengkap": "BEATRIX CLARA",
+    "hubunganKeluarga": "Anak",
+    "jenisKelamin": "P",
+    "tempatLahir": "Kediri",
+    "tanggalLahir": "20/08/2016",
+    "alamatDomisili": "Semampir",
+    "rtRw": "RT 02 / RW 01",
+    "agama": "Katolik",
+    "statusVerifikasi": "Terverifikasi"
+  }
+]

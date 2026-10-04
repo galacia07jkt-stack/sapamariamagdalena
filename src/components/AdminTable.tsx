@@ -18,6 +18,7 @@ import {
 import { WargaKatolik, AgamaType } from '../types';
 import { exportWargaToExcel } from '../utils/excelExport';
 import { hapusWarga, updateWarga, kosongkanSemuaWarga, resetKeDataDemo, syncWithServer } from '../utils/storage';
+import { urutkanWargaSusunanKeluarga } from '../utils/familySort';
 import { SapaLogo } from './SapaLogo';
 
 interface AdminTableProps {
@@ -66,16 +67,16 @@ export const AdminTable: React.FC<AdminTableProps> = ({
 
   // Filtered list
   const filteredList = useMemo(() => {
-    return wargaList.filter((warga) => {
+    const filtered = wargaList.filter((warga) => {
       // 1. Search keyword
       const keyword = searchTerm.trim().toLowerCase();
       const matchSearch =
         !keyword ||
-        warga.namaLengkap.toLowerCase().includes(keyword) ||
-        warga.namaBaptis.toLowerCase().includes(keyword) ||
-        warga.nik.toLowerCase().includes(keyword) ||
-        warga.noKk.toLowerCase().includes(keyword) ||
-        warga.alamatDomisili.toLowerCase().includes(keyword) ||
+        (warga.namaLengkap && warga.namaLengkap.toLowerCase().includes(keyword)) ||
+        (warga.namaBaptis && warga.namaBaptis.toLowerCase().includes(keyword)) ||
+        (warga.nik && warga.nik.toLowerCase().includes(keyword)) ||
+        (warga.noKk && warga.noKk.toLowerCase().includes(keyword)) ||
+        (warga.alamatDomisili && warga.alamatDomisili.toLowerCase().includes(keyword)) ||
         (warga.noSuratBaptis && warga.noSuratBaptis.toLowerCase().includes(keyword));
 
       // 2. Filter RT
@@ -100,6 +101,9 @@ export const AdminTable: React.FC<AdminTableProps> = ({
 
       return matchSearch && matchRt && matchAgama && matchVerif && matchSakramen;
     });
+
+    // Susun secara hierarki resmi: Kepala Keluarga -> Istri -> Anak -> Anggota Lainnya
+    return urutkanWargaSusunanKeluarga(filtered);
   }, [wargaList, searchTerm, filterRt, filterAgama, filterVerif, filterSakramen]);
 
   const showToast = (msg: string) => {
