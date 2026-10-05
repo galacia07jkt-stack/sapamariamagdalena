@@ -9,16 +9,45 @@ const __dirname = path.dirname(__filename);
 
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'warga.json');
+const BACKUP_FILE = path.join(DATA_DIR, 'warga-backup.json');
+const META_FILE = path.join(DATA_DIR, 'meta.json');
 
 // Pastikan folder data tersedia
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Baca database warga secara aman
+function readMeta(): { lastClearedAt: number } {
+  try {
+    if (!fs.existsSync(META_FILE)) {
+      return { lastClearedAt: 0 };
+    }
+    return JSON.parse(fs.readFileSync(META_FILE, 'utf-8'));
+  } catch {
+    return { lastClearedAt: 0 };
+  }
+}
+
+function writeMeta(meta: { lastClearedAt: number }) {
+  try {
+    fs.writeFileSync(META_FILE, JSON.stringify(meta, null, 2), 'utf-8');
+  } catch {}
+}
+
+// Baca database warga secara aman dengan fallback ke backup
 function readDb(): any[] {
   try {
     if (!fs.existsSync(DB_FILE)) {
+      if (fs.existsSync(BACKUP_FILE)) {
+        try {
+          const backupContent = fs.readFileSync(BACKUP_FILE, 'utf-8');
+          const backupParsed = JSON.parse(backupContent);
+          if (Array.isArray(backupParsed) && backupParsed.length > 0) {
+            fs.writeFileSync(DB_FILE, backupContent, 'utf-8');
+            return backupParsed;
+          }
+        } catch {}
+      }
       fs.writeFileSync(DB_FILE, JSON.stringify([], null, 2), 'utf-8');
       return [];
     }
@@ -31,12 +60,19 @@ function readDb(): any[] {
   }
 }
 
-// Tulis database warga secara atomik agar data tidak korup
+// Tulis database warga secara atomik & simpan snapshot backup
 function writeDb(data: any[]): boolean {
   try {
     const tempFile = `${DB_FILE}.tmp`;
     fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
     fs.renameSync(tempFile, DB_FILE);
+
+    // Simpan redundansi ke file backup jika data berisi
+    if (Array.isArray(data) && data.length > 0) {
+      try {
+        fs.writeFileSync(BACKUP_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      } catch {}
+    }
     return true;
   } catch (err) {
     console.error('[SAPA DB] Gagal menulis data warga:', err);
@@ -63,21 +99,25 @@ async function startServer() {
   // API Status & Health Check
   app.get('/api/status', (req, res) => {
     const data = readDb();
+    const meta = readMeta();
     res.json({
       status: 'online',
       storage: 'centralized-json',
       totalWarga: data.length,
+      lastClearedAt: meta.lastClearedAt,
       serverTime: new Date().toISOString()
     });
   });
 
-  // GET: Ambil seluruh data warga (tersinkronisasi untuk semua perangkat HP & Laptop)
+  // GET: Ambil seluruh data warga beserta metadata status hapus
   app.get('/api/warga', (req, res) => {
     const data = readDb();
+    const meta = readMeta();
     res.json({
       success: true,
       count: data.length,
-      data
+      data,
+      lastClearedAt: meta.lastClearedAt || 0
     });
   });
 
@@ -102,6 +142,7 @@ async function startServer() {
     }
 
     writeDb(current);
+    writeMeta({ lastClearedAt: 0 }); // Reset cleared flag jika ada data baru
     console.log(`[SAPA DB] Data warga tersimpan: ${warga.namaLengkap} (Total di server: ${current.length})`);
     
     res.json({
@@ -128,6 +169,7 @@ async function startServer() {
     };
 
     writeDb(current);
+    writeMeta({ lastClearedAt: 0 });
     res.json({ success: true, data: current[idx] });
   });
 
@@ -140,18 +182,26 @@ async function startServer() {
     res.json({ success: true, deletedId: id, total: filtered.length });
   });
 
-  // DELETE: Kosongkan seluruh database (0 data)
+  // DELETE: Kosongkan seluruh database (0 data) dengan cap waktu
   app.delete('/api/warga', (req, res) => {
     writeDb([]);
+    if (fs.existsSync(BACKUP_FILE)) {
+      try { fs.unlinkSync(BACKUP_FILE); } catch {}
+    }
+    const clearedTimestamp = Date.now();
+    writeMeta({ lastClearedAt: clearedTimestamp });
     console.log('[SAPA DB] Database berhasil dikosongkan (0 data)');
-    res.json({ success: true, message: 'Database jemaat berhasil dikosongkan (0 data)' });
+    res.json({ success: true, message: 'Database jemaat berhasil dikosongkan (0 data)', lastClearedAt: clearedTimestamp });
   });
 
-  // POST: Sync batch list (misalnya restore backup)
+  // POST: Sync batch list (misalnya restore backup atau auto-rehydrate dari client)
   app.post('/api/warga/sync', (req, res) => {
     const { list } = req.body;
     if (Array.isArray(list)) {
       writeDb(list);
+      if (list.length > 0) {
+        writeMeta({ lastClearedAt: 0 });
+      }
     }
     res.json({ success: true, total: readDb().length });
   });

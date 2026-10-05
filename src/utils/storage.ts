@@ -1,39 +1,52 @@
 import { WargaKatolik, StatistikParoki } from '../types';
 import { INITIAL_WARGA_DATA } from './mockData';
 import { encryptData, decryptData } from './encryption';
+import { saveToIndexedDb, loadFromIndexedDb, clearIndexedDb } from './indexedDb';
 
 const STORAGE_KEY = 'SAPA_ST_MARIA_MAGDALENA_WARGA_DB_V1';
 const INITIALIZED_FLAG_KEY = 'SAPA_DB_INITIALIZED_FLAG_V1';
 const ENCRYPTED_BACKUP_KEY = 'SAPA_ENCRYPTED_VAULT_BACKUP';
+const PERSISTENT_VAULT_KEY = 'SAPA_PERSISTENT_VAULT_BACKUP_V1';
+const LAST_CLEARED_KEY = 'SAPA_CLIENT_LAST_CLEARED_AT';
 const ADMIN_SESSION_KEY = 'SAPA_ADMIN_AUTH_TOKEN';
 
 // Admin password strictly as requested
 const ADMIN_SECRET_HASH = 'sapa123';
 
 /**
- * Mengambil data jemaat dari localStorage (cache instan)
+ * Mengambil data jemaat dari localStorage (cache instan) dengan fallback ke Persistent Vault
  */
 export function getStoredWarga(): WargaKatolik[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    const hasInitialized = localStorage.getItem(INITIALIZED_FLAG_KEY);
 
-    // Kasus 1: Pengguna pertama kali membuka aplikasi (Awal Berjalannya Aplikasi)
-    // Database dimulai dalam kondisi BERSIH & KOSONG (0 data jemaat), siap untuk input data asli.
-    if (raw === null && !hasInitialized) {
-      saveStoredWarga([]);
-      return [];
+    // Kasus 1: Ada data di storage utama
+    if (raw !== null) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item) => ({
+            ...item,
+            agama: item.agama || 'Katolik',
+          }));
+        }
+      } catch {}
     }
 
-    // Kasus 2: Data ada di localStorage
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed.map((item) => ({
-          ...item,
-          agama: item.agama || 'Katolik',
-        }));
-      }
+    // Kasus 2: Storage utama kosong, cek apakah ada di Persistent Vault Backup
+    const backupRaw = localStorage.getItem(PERSISTENT_VAULT_KEY);
+    if (backupRaw !== null) {
+      try {
+        const backupParsed = JSON.parse(backupRaw);
+        if (Array.isArray(backupParsed) && backupParsed.length > 0) {
+          // Pulihkan kembali ke storage utama
+          localStorage.setItem(STORAGE_KEY, backupRaw);
+          return backupParsed.map((item) => ({
+            ...item,
+            agama: item.agama || 'Katolik',
+          }));
+        }
+      } catch {}
     }
 
     return [];
@@ -44,12 +57,20 @@ export function getStoredWarga(): WargaKatolik[] {
 }
 
 /**
- * Menyimpan data jemaat ke local database dan memicu event sinkronisasi
+ * Menyimpan data jemaat ke local database, persistent vault, dan IndexedDB tahan lama
  */
 export function saveStoredWarga(data: WargaKatolik[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const jsonStr = JSON.stringify(data);
+    localStorage.setItem(STORAGE_KEY, jsonStr);
     localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
+
+    // Jika data berisi jemaat, simpan salinan tahan-lama di vault
+    if (Array.isArray(data) && data.length > 0) {
+      localStorage.setItem(PERSISTENT_VAULT_KEY, jsonStr);
+      saveToIndexedDb(data).catch(() => {});
+    }
+
     window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: data }));
   } catch (err) {
     console.error('Gagal menyimpan ke database lokal:', err);
@@ -57,11 +78,39 @@ export function saveStoredWarga(data: WargaKatolik[]): void {
 }
 
 /**
- * Sinkronisasi data dengan Server Database Pusat (/api/warga)
- * Server bertindak sebagai SINGLE SOURCE OF TRUTH (Pusat Kebenaran Mutlak):
- * - Saat warga mengisi dari HP mana pun, data masuk ke server.
- * - Saat admin atau warga menarik data / polling, server mengirimkan data resmi.
- * - Saat data dihapus di server, data langsung hilang permanen dan TIDAK AKAN PERNAH muncul kembali!
+ * Inisialisasi awal dari IndexedDB browser
+ * Jika pengguna membuka browser baru atau setelah restart dan localStorage kosong,
+ * fungsi ini memeriksa IndexedDB dan memulihkan data jika tersedia.
+ */
+export async function initStorageFromIndexedDb(): Promise<WargaKatolik[]> {
+  const current = getStoredWarga();
+  if (current.length > 0) {
+    // Pastikan IndexedDB tersinkron
+    saveToIndexedDb(current).catch(() => {});
+    return current;
+  }
+
+  try {
+    const idbData = await loadFromIndexedDb();
+    if (Array.isArray(idbData) && idbData.length > 0) {
+      console.log('[SAPA Storage] Data berhasil dipulihkan dari IndexedDB:', idbData.length, 'jiwa');
+      saveStoredWarga(idbData);
+      return idbData;
+    }
+  } catch (err) {
+    console.warn('[SAPA Storage] Gagal load dari IndexedDB:', err);
+  }
+
+  return [];
+}
+
+/**
+ * Sinkronisasi data dua arah dengan Server Database Pusat (/api/warga)
+ * Dilengkapi SISTEM ANTI-KEHILANGAN DATA:
+ * 1. Jika server mengalami restart atau baru hidup (0 data), data lokal TIDAK AKAN PERNAH DIHAPUS.
+ *    Sebaliknya, data lokal otomatis diunggah kembali ke server untuk memulihkan database server.
+ * 2. Jika kedua pihak memiliki data, dilakukan penggabungan cerdas (two-way merge) tanpa duplikasi.
+ * 3. Data hanya dihapus jika admin secara eksplisit menekan tombol "Kosongkan Semua Data".
  */
 export async function syncWithServer(force = false): Promise<WargaKatolik[]> {
   try {
@@ -76,18 +125,96 @@ export async function syncWithServer(force = false): Promise<WargaKatolik[]> {
       const json = await res.json();
       if (json && Array.isArray(json.data)) {
         const serverData: WargaKatolik[] = json.data;
+        const serverLastClearedAt: number = json.lastClearedAt || 0;
 
-        const localRaw = localStorage.getItem(STORAGE_KEY);
-        const localData: WargaKatolik[] = localRaw ? JSON.parse(localRaw) : [];
-
-        // Bandingkan apakah isi data berubah atau dipaksa refresh
-        const isDifferent = JSON.stringify(serverData) !== JSON.stringify(localData);
-        if (isDifferent || force) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
-          localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
-          window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: serverData }));
+        let localData = getStoredWarga();
+        if (localData.length === 0) {
+          const idbData = await loadFromIndexedDb();
+          if (Array.isArray(idbData) && idbData.length > 0) {
+            localData = idbData;
+            saveStoredWarga(localData);
+          }
         }
-        return serverData;
+
+        const clientLastCleared = Number(localStorage.getItem(LAST_CLEARED_KEY) || 0);
+
+        // KASUS 1: Server Kosong (0 data), TETAPI Local memiliki data jemaat
+        // Terjadi saat server container baru hidup / restart di hari berikutnya
+        if (serverData.length === 0 && localData.length > 0) {
+          const wasExplicitlyCleared = serverLastClearedAt > 0 && serverLastClearedAt >= clientLastCleared;
+
+          if (wasExplicitlyCleared) {
+            // Admin memang sengaja mengosongkan data dari server
+            saveStoredWarga([]);
+            await clearIndexedDb();
+            localStorage.removeItem(PERSISTENT_VAULT_KEY);
+            return [];
+          } else {
+            // JANGAN HAPUS DATA LOKAL!
+            // Unggah kembali data lokal ke server pusat agar server terisi kembali
+            console.log('[SAPA Anti-Loss] Server baru hidup kembali. Mengunggah data lokal ke server...');
+            fetch('/api/warga/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+              body: JSON.stringify({ list: localData }),
+            }).catch((err) => console.error('Gagal re-seed server:', err));
+
+            return localData;
+          }
+        }
+
+        // KASUS 2: Server memiliki data, Local kosong (pengguna buka dari HP baru / browser baru)
+        if (serverData.length > 0 && localData.length === 0) {
+          saveStoredWarga(serverData);
+          return serverData;
+        }
+
+        // KASUS 3: Keduanya memiliki data -> Penggabungan Cerdas (Two-Way Merge)
+        if (serverData.length > 0 && localData.length > 0) {
+          const map = new Map<string, WargaKatolik>();
+          // Masukkan data lokal
+          localData.forEach((w) => map.set(w.id, w));
+
+          let needsServerUpdate = false;
+
+          // Gabungkan data server
+          serverData.forEach((sw) => {
+            const lw = map.get(sw.id);
+            if (!lw) {
+              map.set(sw.id, sw);
+            } else {
+              const timeS = new Date(sw.updatedAt || sw.createdAt || 0).getTime();
+              const timeL = new Date(lw.updatedAt || lw.createdAt || 0).getTime();
+              if (timeS >= timeL) {
+                map.set(sw.id, sw);
+              } else {
+                needsServerUpdate = true;
+              }
+            }
+          });
+
+          // Cek apakah ada record lokal yang belum ada di server
+          localData.forEach((lw) => {
+            if (!serverData.some((sw) => sw.id === lw.id)) {
+              needsServerUpdate = true;
+            }
+          });
+
+          const merged = Array.from(map.values());
+          saveStoredWarga(merged);
+
+          if (needsServerUpdate) {
+            fetch('/api/warga/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+              body: JSON.stringify({ list: merged }),
+            }).catch(() => {});
+          }
+
+          return merged;
+        }
+
+        return localData;
       }
     }
   } catch (err) {
@@ -97,10 +224,13 @@ export async function syncWithServer(force = false): Promise<WargaKatolik[]> {
 }
 
 /**
- * Mengosongkan seluruh data jemaat / data demo secara permanen (Otoritas Admin)
- * Menghapus baik di server backend pusat maupun di cache lokal!
+ * Mengosongkan seluruh data jemaat secara permanen (Hanya atas Otoritas Admin)
+ * Menghapus baik di server backend pusat maupun di semua lapisan penyimpanan lokal
  */
 export async function kosongkanSemuaWarga(): Promise<void> {
+  const now = Date.now();
+  localStorage.setItem(LAST_CLEARED_KEY, String(now));
+
   try {
     const res = await fetch('/api/warga', {
       method: 'DELETE',
@@ -114,6 +244,8 @@ export async function kosongkanSemuaWarga(): Promise<void> {
   }
 
   saveStoredWarga([]);
+  localStorage.removeItem(PERSISTENT_VAULT_KEY);
+  await clearIndexedDb();
   localStorage.setItem(INITIALIZED_FLAG_KEY, 'true');
   window.dispatchEvent(new CustomEvent('sapa-warga-updated', { detail: [] }));
 }
@@ -122,6 +254,7 @@ export async function kosongkanSemuaWarga(): Promise<void> {
  * Memuat kembali data contoh/demo bawaan untuk keperluan uji coba
  */
 export async function resetKeDataDemo(): Promise<void> {
+  localStorage.setItem(LAST_CLEARED_KEY, '0');
   try {
     await fetch('/api/warga/sync', {
       method: 'POST',
@@ -149,7 +282,11 @@ export async function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdA
     updatedAt: now,
   };
 
-  // 1. Simpan langsung ke server backend pusat dan tunggu konfirmasi
+  // Simpan segera ke local database agar tidak hilang jika koneksi mendadak putus
+  const currentLocal = getStoredWarga();
+  saveStoredWarga([...currentLocal, newWarga]);
+
+  // Simpan langsung ke server backend pusat dan tunggu konfirmasi
   try {
     const res = await fetch('/api/warga', {
       method: 'POST',
@@ -171,7 +308,7 @@ export async function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdA
     throw err;
   }
 
-  // 2. Tarik data terbaru dari server agar sinkron
+  // Tarik data terbaru dari server agar sinkron
   await syncWithServer(true);
 
   return newWarga;
@@ -230,21 +367,28 @@ export async function updateWarga(id: string, updatedFields: Partial<WargaKatoli
  * Menghapus dari server pusat terlebih dahulu agar saat perangkat lain refresh/tarik data, data tidak muncul lagi!
  */
 export async function hapusWarga(id: string): Promise<boolean> {
+  // 1. Hapus dari server backend pusat terlebih dahulu
   try {
     const res = await fetch(`/api/warga/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: { 'Cache-Control': 'no-store' },
     });
-    if (res.ok) {
-      console.log(`[SAPA Sync] Data ${id} berhasil dihapus dari server pusat.`);
+
+    if (!res.ok) {
+      console.warn('[SAPA Sync] Gagal menghapus di server, melanjutkan penghapusan lokal.');
+    } else {
+      console.log(`[SAPA Sync] Data ${id} berhasil dihapus permanen dari server.`);
     }
   } catch (err) {
-    console.error('Gagal hapus di server:', err);
+    console.error('Error saat request hapus ke server:', err);
   }
 
+  // 2. Hapus dari database lokal
   const list = getStoredWarga();
   const filtered = list.filter((w) => w.id !== id);
   saveStoredWarga(filtered);
+
+  // 3. Tarik data terbaru dari server
   await syncWithServer(true);
 
   return true;
@@ -450,4 +594,3 @@ export const cariWargaOlehNikAtauKk = cariWargaByNikAtauKk;
 export const verifikasiAdminPassword = authenticateAdmin;
 export const exportEncryptedBackup = downloadEncryptedVault;
 export const restoreEncryptedBackup = restoreFromEncryptedVault;
-

@@ -15,7 +15,8 @@ import {
   hitungStatistikParoki, 
   isAdminAuthenticated, 
   logoutAdmin,
-  syncWithServer 
+  syncWithServer,
+  initStorageFromIndexedDb 
 } from './utils/storage';
 import { 
   ShieldCheck, 
@@ -47,6 +48,13 @@ export default function App() {
 
   useEffect(() => {
     refreshData();
+
+    // 0. Pulihkan dari IndexedDB jika localStorage kosong setelah restart/hari baru
+    initStorageFromIndexedDb().then((idbData) => {
+      if (idbData && idbData.length > 0) {
+        setWargaList(idbData);
+      }
+    });
 
     // 1. Initial sync with server
     syncWithServer()
