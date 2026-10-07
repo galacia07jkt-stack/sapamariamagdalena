@@ -16,7 +16,9 @@ import {
   isAdminAuthenticated, 
   logoutAdmin,
   syncWithServer,
-  initStorageFromIndexedDb 
+  initStorageFromIndexedDb,
+  subscribeToWargaFirestore,
+  saveStoredWarga 
 } from './utils/storage';
 import { 
   ShieldCheck, 
@@ -56,7 +58,7 @@ export default function App() {
       }
     });
 
-    // 1. Initial sync with server
+    // 1. Initial sync dengan Database Online Firestore
     syncWithServer()
       .then((data) => {
         setWargaList(data);
@@ -66,9 +68,24 @@ export default function App() {
         setIsServerOnline(false);
       });
 
-    // 2. Real-Time Auto-Polling setiap 3.5 detik
-    // Memastikan jika warga input dari HP atau laptop lain, data langsung otomatis masuk
-    // dan tampil di layar admin tanpa perlu reload halaman!
+    // 2. REAL-TIME PUSH SUBSCRIPTION CLOUD FIRESTORE:
+    // Setiap kali warga di HP mana pun menekan 'Simpan Data', 
+    // data langsung otomatis masuk dan muncul di layar admin seketika tanpa perlu reload!
+    const unsubscribeFirestore = subscribeToWargaFirestore(
+      (onlineData) => {
+        if (onlineData && Array.isArray(onlineData)) {
+          console.log(`[SAPA Realtime] Pembaruan diterima: ${onlineData.length} jemaat.`);
+          setWargaList(onlineData);
+          saveStoredWarga(onlineData);
+          setIsServerOnline(true);
+        }
+      },
+      () => {
+        setIsServerOnline(false);
+      }
+    );
+
+    // 3. Fallback Auto-Polling setiap 5 detik
     const pollingInterval = setInterval(() => {
       syncWithServer()
         .then((data) => {
@@ -78,9 +95,9 @@ export default function App() {
         .catch(() => {
           setIsServerOnline(false);
         });
-    }, 3500);
+    }, 5000);
 
-    // 3. Listener perubahan saat tab/layar diaktifkan kembali
+    // 4. Listener perubahan saat tab/layar diaktifkan kembali
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         syncWithServer().then((data) => setWargaList(data));
@@ -106,6 +123,7 @@ export default function App() {
     window.addEventListener('focus', handleFocus);
 
     return () => {
+      unsubscribeFirestore();
       clearInterval(pollingInterval);
       window.removeEventListener('sapa-warga-updated', handleUpdate);
       window.removeEventListener('sapa-auth-changed', handleAuth);
@@ -175,16 +193,16 @@ export default function App() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8">
         
-        {/* Status Indikator Sinkronisasi Server Pusat untuk Admin */}
+        {/* Status Indikator Sinkronisasi Database Online Real-Time untuk Admin */}
         {isAdmin && activeTab === 'admin' && (
-          <div className="mb-4 px-3.5 py-2.5 bg-emerald-50 border border-emerald-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-900 shadow-2xs">
+          <div className="mb-4 px-3.5 py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-400 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-950 shadow-xs">
             <div className="flex items-center gap-2 font-medium">
-              <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="relative flex h-3 w-3 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
               </span>
               <span>
-                <strong>Database Server Pusat Aktif:</strong> Terkoneksi & tersinkronisasi real-time dengan seluruh HP/Laptop warga yang input data.
+                <strong>Database Online Real-Time Aktif (Cloud Firestore):</strong> Terkoneksi ke satu database cloud terpadu. Setiap input dari HP warga mana pun langsung masuk secara otomatis dan termonitor di layar admin seketika.
               </span>
             </div>
             <div className="flex items-center gap-2 self-end sm:self-center">
@@ -193,14 +211,14 @@ export default function App() {
                   syncWithServer(true).then((data) => setWargaList(data));
                 }}
                 className="flex items-center gap-1.5 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
-                title="Tarik pembaruan data dari server sekarang"
+                title="Tarik pembaruan data dari database online sekarang"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Tarik Data</span>
+                <span>Segarkan Data</span>
               </button>
-              <div className="hidden sm:flex items-center gap-1 font-mono text-[11px] text-emerald-700 bg-emerald-100/70 px-2 py-1 rounded-md">
-                <Wifi className="w-3.5 h-3.5" />
-                <span>Polling 3.5s</span>
+              <div className="hidden sm:flex items-center gap-1 font-mono text-[11px] text-emerald-800 bg-white/80 border border-emerald-300 px-2 py-0.5 rounded-md font-bold">
+                <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Online Real-Time</span>
               </div>
             </div>
           </div>
@@ -209,6 +227,37 @@ export default function App() {
         {/* Tab 1: Pendaftaran Mandiri Warga */}
         {activeTab === 'input' && (
           <div className="max-w-4xl mx-auto animate-fade-in">
+            {/* Banner Pemulihan / Deteksi Pendaftaran Mandiri di HP Warga */}
+            {!isAdmin && wargaList.length > 0 && (
+              <div className="mb-4 p-3.5 bg-gradient-to-r from-sky-50 to-emerald-50 border-2 border-emerald-400 rounded-2xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-extrabold text-sky-950">
+                      Data Keluarga Anda Tersimpan di HP Ini ({wargaList.length} Jiwa)
+                    </h4>
+                    <p className="text-[11px] text-slate-600">
+                      Terakhir mendaftar: <strong>{wargaList[0].namaLengkap}</strong> ({wargaList[0].rtRw}).
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBuktiMode('registration');
+                      setViewingBukti(wargaList[0]);
+                    }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Lihat QR & Bukti</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <FormInputWarga onSuccess={handleWargaRegistered} />
           </div>
         )}

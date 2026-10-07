@@ -9,12 +9,14 @@ import {
   Clock, 
   MessageCircle, 
   UserPlus,
-  Phone
+  Phone,
+  QrCode
 } from 'lucide-react';
 import { WargaKatolik } from '../types';
 import { cariWargaOlehNikAtauKk, syncWithServer } from '../utils/storage';
 import { maskSensitiveId } from '../utils/encryption';
 import { SapaLogo } from './SapaLogo';
+import { generateWhatsAppMessage } from '../utils/dataTransfer';
 
 interface CekUlangWargaProps {
   onOpenBukti: (warga: WargaKatolik) => void;
@@ -243,21 +245,24 @@ export const CekUlangWarga: React.FC<CekUlangWargaProps> = ({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => onOpenBukti(warga)}
-                          className="flex-1 sm:flex-none px-3.5 py-2.5 bg-sky-50 hover:bg-sky-100 text-sky-900 font-bold text-xs rounded-xl border border-sky-300 flex items-center justify-center gap-1.5 min-h-[44px]"
+                          className="flex-1 sm:flex-none px-3.5 py-2.5 bg-sky-50 hover:bg-sky-100 text-sky-900 font-bold text-xs rounded-xl border border-sky-300 flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer"
                         >
-                          <Printer className="w-4 h-4 text-sky-600" />
-                          <span>Cetak Bukti</span>
+                          <QrCode className="w-4 h-4 text-sky-700" />
+                          <span>QR & Bukti</span>
                         </button>
 
-                        <a
-                          href={`https://wa.me/6281233445566?text=Halo%20Sekretaris%20Lingkungan%20St.%20Maria%20Magdalena%20Semampir,%20saya%20ingin%20konfirmasi%20data%20SAPA%20atas%20nama%20${encodeURIComponent((warga.namaBaptis ? warga.namaBaptis + ' ' : '') + warga.namaLengkap)}%20(NIK:%20${warga.nik})`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex-1 sm:flex-none px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs rounded-xl border border-emerald-300 flex items-center justify-center gap-1.5 min-h-[44px]"
+                        <button
+                          onClick={() => {
+                            const msg = generateWhatsAppMessage(warga);
+                            const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+                            window.open(url, '_blank');
+                          }}
+                          className="flex-1 sm:flex-none px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs rounded-xl border border-emerald-300 flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer"
+                          title="Kirim rincian dan kode setor data ke WhatsApp Pengurus/Admin"
                         >
                           <MessageCircle className="w-4 h-4 text-emerald-600" />
-                          <span>Konfirmasi WA</span>
-                        </a>
+                          <span>Kirim ke Admin</span>
+                        </button>
                       </div>
                     </div>
                   </div>

@@ -2,6 +2,15 @@ import { WargaKatolik, StatistikParoki } from '../types';
 import { INITIAL_WARGA_DATA } from './mockData';
 import { encryptData, decryptData } from './encryption';
 import { saveToIndexedDb, loadFromIndexedDb, clearIndexedDb } from './indexedDb';
+import { 
+  saveWargaToFirestore, 
+  updateWargaInFirestore, 
+  deleteWargaFromFirestore, 
+  fetchAllWargaFromFirestore, 
+  clearAllWargaInFirestore, 
+  syncBatchToFirestore,
+  subscribeToWargaFirestore
+} from './firebase';
 
 const STORAGE_KEY = 'SAPA_ST_MARIA_MAGDALENA_WARGA_DB_V1';
 const INITIALIZED_FLAG_KEY = 'SAPA_DB_INITIALIZED_FLAG_V1';
@@ -79,13 +88,10 @@ export function saveStoredWarga(data: WargaKatolik[]): void {
 
 /**
  * Inisialisasi awal dari IndexedDB browser
- * Jika pengguna membuka browser baru atau setelah restart dan localStorage kosong,
- * fungsi ini memeriksa IndexedDB dan memulihkan data jika tersedia.
  */
 export async function initStorageFromIndexedDb(): Promise<WargaKatolik[]> {
   const current = getStoredWarga();
   if (current.length > 0) {
-    // Pastikan IndexedDB tersinkron
     saveToIndexedDb(current).catch(() => {});
     return current;
   }
@@ -105,14 +111,51 @@ export async function initStorageFromIndexedDb(): Promise<WargaKatolik[]> {
 }
 
 /**
- * Sinkronisasi data dua arah dengan Server Database Pusat (/api/warga)
- * Dilengkapi SISTEM ANTI-KEHILANGAN DATA:
- * 1. Jika server mengalami restart atau baru hidup (0 data), data lokal TIDAK AKAN PERNAH DIHAPUS.
- *    Sebaliknya, data lokal otomatis diunggah kembali ke server untuk memulihkan database server.
- * 2. Jika kedua pihak memiliki data, dilakukan penggabungan cerdas (two-way merge) tanpa duplikasi.
- * 3. Data hanya dihapus jika admin secara eksplisit menekan tombol "Kosongkan Semua Data".
+ * Sinkronisasi data dengan Database Online Cloud Firestore
+ * Terkoneksi langsung dan terpadu untuk semua perangkat HP & Laptop warga dan admin
  */
 export async function syncWithServer(force = false): Promise<WargaKatolik[]> {
+  // 1. Tarik dari Database Online Firestore (Paling Akurat & Global)
+  try {
+    const firestoreData = await fetchAllWargaFromFirestore();
+    const localData = getStoredWarga();
+
+    if (firestoreData.length > 0) {
+      const map = new Map<string, WargaKatolik>();
+      firestoreData.forEach((w) => map.set(w.id, w));
+
+      let hasLocalUnsaved = false;
+      const unuploaded: WargaKatolik[] = [];
+
+      localData.forEach((lw) => {
+        if (!map.has(lw.id)) {
+          map.set(lw.id, lw);
+          unuploaded.push(lw);
+          hasLocalUnsaved = true;
+        }
+      });
+
+      const merged = Array.from(map.values());
+      saveStoredWarga(merged);
+
+      // Jika ada data pendaftaran di perangkat ini yang belum tersimpan di Firestore online, unggah sekarang
+      if (hasLocalUnsaved && unuploaded.length > 0) {
+        console.log(`[SAPA Sync] Mengunggah ${unuploaded.length} data lokal baru ke Firestore Online...`);
+        syncBatchToFirestore(unuploaded).catch(() => {});
+      }
+
+      return merged;
+    } else if (localData.length > 0) {
+      // Firestore online masih baru/kosong, migrasikan data lokal yang ada ke database online
+      console.log('[SAPA Sync] Memigrasikan data pendaftaran lokal ke Database Online Firestore...');
+      await syncBatchToFirestore(localData);
+      return localData;
+    }
+  } catch (err) {
+    console.warn('[SAPA Sync] Gagal koneksi Firestore online:', err);
+  }
+
+  // 2. Cadangan: Coba koneksi ke backend Express jika tersedia
   try {
     const res = await fetch(`/api/warga?t=${Date.now()}`, {
       headers: {
@@ -123,126 +166,42 @@ export async function syncWithServer(force = false): Promise<WargaKatolik[]> {
 
     if (res.ok) {
       const json = await res.json();
-      if (json && Array.isArray(json.data)) {
-        const serverData: WargaKatolik[] = json.data;
-        const serverLastClearedAt: number = json.lastClearedAt || 0;
-
-        let localData = getStoredWarga();
-        if (localData.length === 0) {
-          const idbData = await loadFromIndexedDb();
-          if (Array.isArray(idbData) && idbData.length > 0) {
-            localData = idbData;
-            saveStoredWarga(localData);
-          }
-        }
-
-        const clientLastCleared = Number(localStorage.getItem(LAST_CLEARED_KEY) || 0);
-
-        // KASUS 1: Server Kosong (0 data), TETAPI Local memiliki data jemaat
-        // Terjadi saat server container baru hidup / restart di hari berikutnya
-        if (serverData.length === 0 && localData.length > 0) {
-          const wasExplicitlyCleared = serverLastClearedAt > 0 && serverLastClearedAt >= clientLastCleared;
-
-          if (wasExplicitlyCleared) {
-            // Admin memang sengaja mengosongkan data dari server
-            saveStoredWarga([]);
-            await clearIndexedDb();
-            localStorage.removeItem(PERSISTENT_VAULT_KEY);
-            return [];
-          } else {
-            // JANGAN HAPUS DATA LOKAL!
-            // Unggah kembali data lokal ke server pusat agar server terisi kembali
-            console.log('[SAPA Anti-Loss] Server baru hidup kembali. Mengunggah data lokal ke server...');
-            fetch('/api/warga/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-              body: JSON.stringify({ list: localData }),
-            }).catch((err) => console.error('Gagal re-seed server:', err));
-
-            return localData;
-          }
-        }
-
-        // KASUS 2: Server memiliki data, Local kosong (pengguna buka dari HP baru / browser baru)
-        if (serverData.length > 0 && localData.length === 0) {
-          saveStoredWarga(serverData);
-          return serverData;
-        }
-
-        // KASUS 3: Keduanya memiliki data -> Penggabungan Cerdas (Two-Way Merge)
-        if (serverData.length > 0 && localData.length > 0) {
-          const map = new Map<string, WargaKatolik>();
-          // Masukkan data lokal
-          localData.forEach((w) => map.set(w.id, w));
-
-          let needsServerUpdate = false;
-
-          // Gabungkan data server
-          serverData.forEach((sw) => {
-            const lw = map.get(sw.id);
-            if (!lw) {
-              map.set(sw.id, sw);
-            } else {
-              const timeS = new Date(sw.updatedAt || sw.createdAt || 0).getTime();
-              const timeL = new Date(lw.updatedAt || lw.createdAt || 0).getTime();
-              if (timeS >= timeL) {
-                map.set(sw.id, sw);
-              } else {
-                needsServerUpdate = true;
-              }
-            }
-          });
-
-          // Cek apakah ada record lokal yang belum ada di server
-          localData.forEach((lw) => {
-            if (!serverData.some((sw) => sw.id === lw.id)) {
-              needsServerUpdate = true;
-            }
-          });
-
-          const merged = Array.from(map.values());
-          saveStoredWarga(merged);
-
-          if (needsServerUpdate) {
-            fetch('/api/warga/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-              body: JSON.stringify({ list: merged }),
-            }).catch(() => {});
-          }
-
-          return merged;
-        }
-
-        return localData;
+      if (json && Array.isArray(json.data) && json.data.length > 0) {
+        saveStoredWarga(json.data);
+        syncBatchToFirestore(json.data).catch(() => {});
+        return json.data;
       }
     }
-  } catch (err) {
-    console.warn('[SAPA Sync] Gagal koneksi ke server, menggunakan data lokal cache:', err);
-  }
+  } catch {}
+
   return getStoredWarga();
 }
 
 /**
- * Mengosongkan seluruh data jemaat secara permanen (Hanya atas Otoritas Admin)
- * Menghapus baik di server backend pusat maupun di semua lapisan penyimpanan lokal
+ * Mengosongkan seluruh data jemaat secara permanen (Otoritas Admin)
+ * Menghapus dari Database Online Firestore, Server Pusat, dan Penyimpanan Lokal
  */
 export async function kosongkanSemuaWarga(): Promise<void> {
   const now = Date.now();
   localStorage.setItem(LAST_CLEARED_KEY, String(now));
 
+  // 1. Kosongkan Database Online Firestore
   try {
-    const res = await fetch('/api/warga', {
+    await clearAllWargaInFirestore();
+    console.log('[SAPA Sync] Database Online Firestore berhasil dikosongkan.');
+  } catch (err) {
+    console.error('Gagal hapus Firestore:', err);
+  }
+
+  // 2. Kosongkan server backend lokal jika aktif
+  try {
+    await fetch('/api/warga', {
       method: 'DELETE',
       headers: { 'Cache-Control': 'no-store' },
     });
-    if (res.ok) {
-      console.log('[SAPA Sync] Database di server berhasil dikosongkan.');
-    }
-  } catch (err) {
-    console.error('Gagal hapus database di server:', err);
-  }
+  } catch {}
 
+  // 3. Bersihkan cache lokal
   saveStoredWarga([]);
   localStorage.removeItem(PERSISTENT_VAULT_KEY);
   await clearIndexedDb();
@@ -255,15 +214,19 @@ export async function kosongkanSemuaWarga(): Promise<void> {
  */
 export async function resetKeDataDemo(): Promise<void> {
   localStorage.setItem(LAST_CLEARED_KEY, '0');
+  
+  // Masukkan ke Firestore Online
+  try {
+    await syncBatchToFirestore(INITIAL_WARGA_DATA);
+  } catch {}
+
   try {
     await fetch('/api/warga/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
       body: JSON.stringify({ list: INITIAL_WARGA_DATA }),
     });
-  } catch (err) {
-    console.error('Gagal kirim reset demo ke server:', err);
-  }
+  } catch {}
 
   saveStoredWarga(INITIAL_WARGA_DATA);
   await syncWithServer(true);
@@ -271,7 +234,7 @@ export async function resetKeDataDemo(): Promise<void> {
 
 /**
  * Tambah warga baru (dari formulir mandiri HP umat atau laptop admin)
- * Wajib menunggu respon dari server pusat (AWAIT) agar data pasti tersimpan di database server!
+ * LANGSUNG DISIMPAN KE DATABASE ONLINE FIRESTORE SECARA REAL-TIME!
  */
 export async function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdAt' | 'updatedAt'>): Promise<WargaKatolik> {
   const now = new Date().toISOString();
@@ -282,105 +245,87 @@ export async function tambahWarga(wargaData: Omit<WargaKatolik, 'id' | 'createdA
     updatedAt: now,
   };
 
-  // Simpan segera ke local database agar tidak hilang jika koneksi mendadak putus
+  // 1. Simpan segera ke local database agar instan
   const currentLocal = getStoredWarga();
   saveStoredWarga([...currentLocal, newWarga]);
 
-  // Simpan langsung ke server backend pusat dan tunggu konfirmasi
+  // 2. SIMPAN KE DATABASE ONLINE FIRESTORE (Paling Utama & Nyata)
   try {
-    const res = await fetch('/api/warga', {
+    await saveWargaToFirestore(newWarga);
+    console.log(`[SAPA Online DB] Sukses menyimpan ${newWarga.namaLengkap} ke Database Online!`);
+  } catch (firestoreErr) {
+    console.warn('[SAPA Online DB] Peringatan koneksi Firestore:', firestoreErr);
+  }
+
+  // 3. Kirim ke backend server jika ada
+  try {
+    fetch('/api/warga', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store'
       },
       body: JSON.stringify(newWarga),
-    });
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      throw new Error(errJson.error || 'Server menolak penyimpanan data.');
-    }
-
-    console.log('[SAPA Sync] Berhasil disimpan di database pusat:', newWarga.namaLengkap);
-  } catch (err) {
-    console.error('[SAPA Sync] Gagal kirim ke server pusat:', err);
-    throw err;
-  }
-
-  // Tarik data terbaru dari server agar sinkron
-  await syncWithServer(true);
+    }).catch(() => {});
+  } catch {}
 
   return newWarga;
 }
 
 /**
  * Perbarui data warga
- * Mengirim pembaruan langsung ke database server pusat dan memperbarui state lokal
+ * Mengirim pembaruan langsung ke Database Online Firestore dan memicu sinkronisasi
  */
 export async function updateWarga(id: string, updatedFields: Partial<WargaKatolik>): Promise<WargaKatolik | null> {
-  let updatedRecord: WargaKatolik | null = null;
+  const now = new Date().toISOString();
+  const fieldsWithTimestamp = {
+    ...updatedFields,
+    updatedAt: now,
+  };
 
-  // 1. Kirim pembaruan ke database server pusat terlebih dahulu
+  // 1. Perbarui di Database Online Firestore
   try {
-    const res = await fetch(`/api/warga/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-      body: JSON.stringify(updatedFields),
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      if (json && json.data) {
-        updatedRecord = json.data;
-        console.log(`[SAPA Sync] Data ${id} berhasil diperbarui di server:`, updatedFields);
-      }
-    }
+    await updateWargaInFirestore(id, fieldsWithTimestamp);
+    console.log(`[SAPA Online DB] Data ${id} berhasil diperbarui di Database Online.`);
   } catch (err) {
-    console.error('[SAPA Sync] Gagal update di server:', err);
+    console.warn('[SAPA Online DB] Gagal update di Firestore:', err);
   }
 
   // 2. Perbarui data lokal
   const list = getStoredWarga();
   const index = list.findIndex((w) => w.id === id);
+  let updatedRecord: WargaKatolik | null = null;
 
   if (index !== -1) {
     list[index] = {
       ...list[index],
-      ...updatedFields,
-      updatedAt: new Date().toISOString(),
+      ...fieldsWithTimestamp,
     };
-    if (!updatedRecord) updatedRecord = list[index];
+    updatedRecord = list[index];
     saveStoredWarga(list);
-  } else if (updatedRecord) {
-    saveStoredWarga([updatedRecord, ...list]);
   }
 
-  // 3. Tarik data terbaru dari server
-  await syncWithServer(true);
+  // 3. Kirim ke backend express jika ada
+  fetch(`/api/warga/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    body: JSON.stringify(fieldsWithTimestamp),
+  }).catch(() => {});
 
   return updatedRecord;
 }
 
 /**
  * Hapus data warga secara permanen
- * Menghapus dari server pusat terlebih dahulu agar saat perangkat lain refresh/tarik data, data tidak muncul lagi!
+ * Menghapus dari Database Online Firestore dan database lokal
  */
 export async function hapusWarga(id: string): Promise<boolean> {
-  // 1. Hapus dari server backend pusat terlebih dahulu
+  // 1. Hapus dari Database Online Firestore
   try {
-    const res = await fetch(`/api/warga/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers: { 'Cache-Control': 'no-store' },
-    });
-
-    if (!res.ok) {
-      console.warn('[SAPA Sync] Gagal menghapus di server, melanjutkan penghapusan lokal.');
-    } else {
-      console.log(`[SAPA Sync] Data ${id} berhasil dihapus permanen dari server.`);
-    }
+    await deleteWargaFromFirestore(id);
+    console.log(`[SAPA Online DB] Data ${id} berhasil dihapus dari Database Online.`);
   } catch (err) {
-    console.error('Error saat request hapus ke server:', err);
+    console.warn('[SAPA Online DB] Gagal hapus dari Firestore:', err);
   }
 
   // 2. Hapus dari database lokal
@@ -388,15 +333,17 @@ export async function hapusWarga(id: string): Promise<boolean> {
   const filtered = list.filter((w) => w.id !== id);
   saveStoredWarga(filtered);
 
-  // 3. Tarik data terbaru dari server
-  await syncWithServer(true);
+  // 3. Hapus di backend Express jika ada
+  fetch(`/api/warga/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { 'Cache-Control': 'no-store' },
+  }).catch(() => {});
 
   return true;
 }
 
 /**
  * Pencarian data untuk fitur "Cek Ulang Warga"
- * Berdasarkan NIK atau Nomor KK
  */
 export function cariWargaByNikAtauKk(keyword: string): WargaKatolik[] {
   const cleanKeyword = keyword.trim().toLowerCase();
@@ -575,12 +522,7 @@ export async function restoreFromEncryptedVault(encryptedStr: string, passkey: s
     const payload = JSON.parse(decryptedJson);
     if (payload && Array.isArray(payload.data)) {
       saveStoredWarga(payload.data);
-      // Kirim sinkronisasi ke server juga
-      fetch('/api/warga/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ list: payload.data }),
-      }).catch((err) => console.error('Gagal sync restore ke server:', err));
+      syncBatchToFirestore(payload.data).catch(() => {});
       return true;
     }
     return false;
@@ -589,7 +531,8 @@ export async function restoreFromEncryptedVault(encryptedStr: string, passkey: s
   }
 }
 
-// Export aliases untuk kompatibilitas komponen
+// Re-export real-time listener dan aliases
+export { subscribeToWargaFirestore };
 export const cariWargaOlehNikAtauKk = cariWargaByNikAtauKk;
 export const verifikasiAdminPassword = authenticateAdmin;
 export const exportEncryptedBackup = downloadEncryptedVault;

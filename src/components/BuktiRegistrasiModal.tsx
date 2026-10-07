@@ -1,7 +1,20 @@
-import React, { useState } from 'react';
-import { X, Printer, ShieldCheck, CheckCircle2, UserPlus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  X, 
+  Printer, 
+  ShieldCheck, 
+  CheckCircle2, 
+  UserPlus, 
+  MessageSquare, 
+  QrCode, 
+  Copy, 
+  Check, 
+  Share2 
+} from 'lucide-react';
 import { WargaKatolik } from '../types';
 import { SapaLogo } from './SapaLogo';
+import { generateQrPayload, generateWhatsAppMessage } from '../utils/dataTransfer';
+import QRCode from 'qrcode';
 
 interface BuktiRegistrasiModalProps {
   warga: WargaKatolik | null;
@@ -17,12 +30,31 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
   mode = 'registration',
 }) => {
   const [showThankYou, setShowThankYou] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [copiedCode, setCopiedCode] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
       setShowThankYou(false);
+      setCopiedCode(false);
     }
   }, [isOpen, warga?.id]);
+
+  useEffect(() => {
+    if (warga) {
+      const payload = generateQrPayload(warga);
+      QRCode.toDataURL(payload, {
+        width: 150,
+        margin: 1,
+        color: {
+          dark: '#0c4a6e',
+          light: '#ffffff',
+        },
+      })
+        .then((url) => setQrDataUrl(url))
+        .catch(() => {});
+    }
+  }, [warga]);
 
   if (!isOpen || !warga) return null;
 
@@ -37,6 +69,22 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
   const handleDismissAll = () => {
     setShowThankYou(false);
     onClose();
+  };
+
+  const handleSendToWhatsApp = () => {
+    if (!warga) return;
+    const msg = generateWhatsAppMessage(warga);
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleCopySyncCode = () => {
+    if (!warga) return;
+    const msg = generateWhatsAppMessage(warga);
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 3000);
+    });
   };
 
   const formattedDate = new Date().toLocaleDateString('id-ID', {
@@ -78,43 +126,32 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
             <img
               src="/romo-berkah-dalem.jpg"
               alt="Romo Salam Berkah Dalem 2 Tangan di Dada"
-              className="w-full h-full object-contain object-top"
+              className="w-full h-full object-cover object-top"
+              loading="lazy"
             />
           </div>
 
-          {/* Pesan Sesuai Permintaan Pengguna */}
-          <div className="my-3 w-full bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 p-4 rounded-2xl border-2 border-orange-400 shadow-xs">
-            <p className="text-xs sm:text-sm font-black text-sky-950 uppercase tracking-wide leading-relaxed">
-              "TERIMA KASIH Dukungan Regristrasi data Lingkungan St. Maria Magdalena, Tuhan Memberkati, Berkah Dalem"
+          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 my-2 text-center w-full">
+            <h3 className="font-black text-sm sm:text-base text-orange-950 mb-0.5">
+              Maturnuwun Sanget, Berkah Dalem!
+            </h3>
+            <p className="text-xs text-slate-700 leading-relaxed font-medium">
+              Data pendaftaran jemaat atas nama{' '}
+              <strong className="text-sky-950 font-extrabold">{warga.namaLengkap}</strong>{' '}
+              telah berhasil dicatat.
             </p>
           </div>
 
-          {/* Ringkasan Data Warga yang Baru Terdaftar */}
-          <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 mb-4 text-left space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Nama Lengkap:</span>
-              <span className="font-extrabold text-sky-950 text-right">{warga.namaLengkap}</span>
-            </div>
-            {warga.namaBaptis && (
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 font-medium">Nama Baptis:</span>
-                <span className="font-bold text-orange-700 text-right">{warga.namaBaptis}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Tempat, Tgl Lahir:</span>
-              <span className="font-semibold text-slate-800 text-right">
-                {warga.tempatLahir ? `${warga.tempatLahir}, ` : ''}{warga.tanggalLahir || '-'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Wilayah RT/RW:</span>
-              <span className="font-semibold text-slate-800 text-right">{warga.rtRw} Semampir</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">No. Registrasi:</span>
-              <span className="font-mono text-slate-600 text-right text-[11px]">{warga.id}</span>
-            </div>
+          {/* Tombol Kirim ke WhatsApp Admin Sebelum Keluar */}
+          <div className="w-full space-y-2 mb-3">
+            <button
+              type="button"
+              onClick={handleSendToWhatsApp}
+              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition active:scale-98 cursor-pointer"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Kirim Data Registrasi ke WhatsApp Admin</span>
+            </button>
           </div>
 
           {/* Tombol Selesai & Kembali ke Form Pendataan Warga */}
@@ -139,7 +176,7 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
             </div>
             
             <div className="flex items-center gap-2">
-              {/* JIKA MODE REGISTRASI: GANTI BUTTON CETAK DENGAN 'SELESAI & KEMBALI KE FORM PENDATAAN WARGA' */}
+              {/* Mode Registrasi */}
               {isRegistrationMode ? (
                 <button
                   type="button"
@@ -148,11 +185,11 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
                   title="Selesai dan kembali ke form pendataan warga"
                 >
                   <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
-                  <span className="hidden sm:inline">Selesai & Kembali ke Form Pendataan Warga</span>
-                  <span className="sm:hidden">Selesai & Kembali</span>
+                  <span className="hidden sm:inline">Selesai & Kembali</span>
+                  <span className="sm:hidden">Selesai</span>
                 </button>
               ) : (
-                /* JIKA MODE ADMIN: TAMPILKAN BUTTON CETAK / PDF KHUSUS AKSES ADMIN */
+                /* Mode Admin */
                 <button
                   type="button"
                   onClick={handlePrint}
@@ -180,8 +217,35 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
             </div>
           </div>
 
+          {/* Action Ribbon: Kirim ke WhatsApp Admin */}
+          <div className="print:hidden bg-emerald-50 border-b border-emerald-200 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs text-emerald-950 font-medium">
+              <Share2 className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>Pastikan data Anda masuk ke Admin Paroki dengan mengirimkan bukti ini:</span>
+            </div>
+            <div className="flex items-center gap-1.5 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleSendToWhatsApp}
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-lg shadow-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Kirim via WhatsApp</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleCopySyncCode}
+                className="px-2.5 py-1.5 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 text-xs font-bold rounded-lg flex items-center gap-1 transition cursor-pointer"
+                title="Salin rincian data untuk dikirim manual"
+              >
+                {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{copiedCode ? 'Tersalin' : 'Salin Kode'}</span>
+              </button>
+            </div>
+          </div>
+
           {/* Printable Certificate Content */}
-          <div className="p-4 sm:p-8 bg-white border-4 sm:border-8 border-double border-orange-400 m-2 sm:m-3 rounded-xl sm:rounded-2xl relative overflow-y-auto">
+          <div className="p-4 sm:p-7 bg-white border-4 sm:border-8 border-double border-orange-400 m-2 sm:m-3 rounded-xl sm:rounded-2xl relative overflow-y-auto">
             
             {/* Letterhead Kop Surat */}
             <div className="text-center pb-3 sm:pb-4 border-b-2 border-sky-950">
@@ -217,78 +281,96 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
               </div>
             </div>
 
-            {/* Citizen Details Table */}
-            <div className="space-y-2 text-xs text-slate-800 my-4 sm:my-5 bg-slate-50/70 p-3 sm:p-4 rounded-xl border border-slate-200">
-              <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                <span className="text-slate-500 font-semibold">Agama:</span>
-                <span className="col-span-2 font-bold text-sky-950">{warga.agama || 'Katolik'}</span>
-              </div>
-
-              {(warga.agama || 'Katolik') === 'Katolik' && (
+            {/* Citizen Details Table & QR Code Side-by-Side */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 my-3">
+              
+              {/* Detail fields */}
+              <div className="md:col-span-3 space-y-1.5 text-xs text-slate-800 bg-slate-50/70 p-3 sm:p-4 rounded-xl border border-slate-200">
                 <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                  <span className="text-slate-500 font-semibold">Nama Baptis:</span>
-                  <span className="col-span-2 font-bold text-orange-700 text-xs sm:text-sm">{warga.namaBaptis || '-'}</span>
+                  <span className="text-slate-500 font-semibold">Agama:</span>
+                  <span className="col-span-2 font-bold text-sky-950">{warga.agama || 'Katolik'}</span>
                 </div>
-              )}
 
-              <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                <span className="text-slate-500 font-semibold">Nama Lengkap:</span>
-                <span className="col-span-2 font-extrabold text-sky-950 text-xs sm:text-sm">{warga.namaLengkap}</span>
+                {(warga.agama || 'Katolik') === 'Katolik' && (
+                  <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                    <span className="text-slate-500 font-semibold">Nama Baptis:</span>
+                    <span className="col-span-2 font-bold text-orange-700 text-xs sm:text-sm">{warga.namaBaptis || '-'}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                  <span className="text-slate-500 font-semibold">Nama Lengkap:</span>
+                  <span className="col-span-2 font-extrabold text-sky-950 text-xs sm:text-sm">{warga.namaLengkap}</span>
+                </div>
+                <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                  <span className="text-slate-500 font-semibold">Tempat, Tgl Lahir:</span>
+                  <span className="col-span-2 font-medium text-slate-900">
+                    {warga.tempatLahir ? `${warga.tempatLahir}, ` : ''}{warga.tanggalLahir || '-'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                  <span className="text-slate-500 font-semibold">NIK (KTP):</span>
+                  <span className="col-span-2 font-mono font-semibold">{warga.nik}</span>
+                </div>
+                <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                  <span className="text-slate-500 font-semibold">Nomor Kartu Keluarga:</span>
+                  <span className="col-span-2 font-mono font-semibold">{warga.noKk}</span>
+                </div>
+                <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                  <span className="text-slate-500 font-semibold">Hubungan Keluarga:</span>
+                  <span className="col-span-2 font-medium">{warga.hubunganKeluarga} ({warga.jenisKelamin === 'L' ? 'Laki-Laki' : 'Perempuan'})</span>
+                </div>
+                <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                  <span className="text-slate-500 font-semibold">Alamat Domisili:</span>
+                  <span className="col-span-2 font-medium">{warga.alamatDomisili} ({warga.rtRw} Semampir)</span>
+                </div>
+
+                {(warga.agama || 'Katolik') === 'Katolik' ? (
+                  <>
+                    <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                      <span className="text-slate-500 font-semibold">Tempat Baptis:</span>
+                      <span className="col-span-2 font-medium">{warga.tempatBaptis || '-'}</span>
+                    </div>
+                    <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
+                      <span className="text-slate-500 font-semibold">No. Akta Baptis:</span>
+                      <span className="col-span-2 font-mono font-bold text-orange-800">{warga.noSuratBaptis || '-'}</span>
+                    </div>
+                    <div className="grid grid-cols-3 py-1 gap-1">
+                      <span className="text-slate-500 font-semibold">Status Sakramen:</span>
+                      <span className="col-span-2 font-medium">
+                        Komuni: {warga.sakramenLain?.komuniPertama ? 'Sudah' : 'Belum'} • Krisma: {warga.sakramenLain?.krisma ? 'Sudah' : 'Belum'}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-3 py-1 gap-1">
+                    <span className="text-slate-500 font-semibold">Tgl Lahir:</span>
+                    <span className="col-span-2 font-mono font-medium">{warga.tanggalLahir || '-'}</span>
+                  </div>
+                )}
               </div>
-              <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                <span className="text-slate-500 font-semibold">Tempat, Tgl Lahir:</span>
-                <span className="col-span-2 font-medium text-slate-900">
-                  {warga.tempatLahir ? `${warga.tempatLahir}, ` : ''}{warga.tanggalLahir || '-'}
+
+              {/* QR Code Container on Certificate */}
+              <div className="md:col-span-1 flex flex-col items-center justify-center p-3 bg-sky-50/60 rounded-xl border border-sky-200 text-center">
+                <span className="text-[10px] font-black uppercase text-sky-900 mb-1 tracking-wide">
+                  QR Bukti SAPA
+                </span>
+                {qrDataUrl ? (
+                  <img
+                    src={qrDataUrl}
+                    alt="QR Bukti Pendataan SAPA"
+                    className="w-28 h-28 sm:w-32 sm:h-32 rounded-lg border border-sky-300 bg-white p-1 shadow-2xs"
+                  />
+                ) : (
+                  <div className="w-28 h-28 bg-slate-200 animate-pulse rounded-lg flex items-center justify-center text-[10px] text-slate-500">
+                    Memuat QR...
+                  </div>
+                )}
+                <span className="text-[9px] text-slate-500 mt-1 font-medium leading-tight">
+                  Pindai lewat HP Admin untuk himpun data otomatis
                 </span>
               </div>
-              <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                <span className="text-slate-500 font-semibold">NIK (KTP):</span>
-                <span className="col-span-2 font-mono font-semibold">{warga.nik}</span>
-              </div>
-              <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                <span className="text-slate-500 font-semibold">Nomor Kartu Keluarga:</span>
-                <span className="col-span-2 font-mono font-semibold">{warga.noKk}</span>
-              </div>
-              <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                <span className="text-slate-500 font-semibold">Hubungan Keluarga:</span>
-                <span className="col-span-2 font-medium">{warga.hubunganKeluarga} ({warga.jenisKelamin === 'L' ? 'Laki-Laki' : 'Perempuan'})</span>
-              </div>
-              <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                <span className="text-slate-500 font-semibold">Alamat Domisili:</span>
-                <span className="col-span-2 font-medium">{warga.alamatDomisili} ({warga.rtRw} Semampir)</span>
-              </div>
 
-              {(warga.agama || 'Katolik') === 'Katolik' ? (
-                <>
-                  <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                    <span className="text-slate-500 font-semibold">Tempat Baptis:</span>
-                    <span className="col-span-2 font-medium">{warga.tempatBaptis || '-'}</span>
-                  </div>
-                  <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                    <span className="text-slate-500 font-semibold">Paroki / Kota:</span>
-                    <span className="col-span-2 font-medium">{warga.parokiKotaBaptis || '-'}</span>
-                  </div>
-                  <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                    <span className="text-slate-500 font-semibold">No. Akta Baptis:</span>
-                    <span className="col-span-2 font-mono font-bold text-orange-800">{warga.noSuratBaptis || '-'}</span>
-                  </div>
-                  <div className="grid grid-cols-3 py-1 border-b border-slate-200 gap-1">
-                    <span className="text-slate-500 font-semibold">Tanggal Baptis:</span>
-                    <span className="col-span-2 font-medium font-mono">{warga.tanggalBaptis || '-'}</span>
-                  </div>
-                  <div className="grid grid-cols-3 py-1 gap-1">
-                    <span className="text-slate-500 font-semibold">Status Sakramen:</span>
-                    <span className="col-span-2 font-medium">
-                      Komuni: {warga.sakramenLain?.komuniPertama ? 'Sudah' : 'Belum'} • Krisma: {warga.sakramenLain?.krisma ? 'Sudah' : 'Belum'}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="grid grid-cols-3 py-1 gap-1">
-                  <span className="text-slate-500 font-semibold">Tgl Lahir:</span>
-                  <span className="col-span-2 font-mono font-medium">{warga.tanggalLahir || '-'}</span>
-                </div>
-              )}
             </div>
 
             {/* Security & Sign Off */}
@@ -307,7 +389,7 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
                 <p className="text-[11px] text-slate-600">Kediri, {formattedDate}</p>
                 <p className="font-bold text-slate-800 mt-0.5">Pengurus Lingkungan</p>
                 <p className="font-semibold text-slate-700">St. Maria Magdalena</p>
-                <div className="h-12 flex items-center justify-center">
+                <div className="h-10 flex items-center justify-center">
                   <span className="text-[10px] text-slate-400 italic">( Tanda Tangan & Cap )</span>
                 </div>
                 <p className="font-bold text-slate-900 border-t border-slate-400 pt-0.5 text-[11px]">
@@ -318,13 +400,22 @@ export const BuktiRegistrasiModal: React.FC<BuktiRegistrasiModalProps> = ({
 
             {/* Tombol Besar Selesai & Kembali ke Form Pendataan di Bagian Bawah Kartu */}
             {isRegistrationMode && (
-              <div className="print:hidden mt-5 pt-4 border-t-2 border-orange-200">
+              <div className="print:hidden mt-5 pt-4 border-t-2 border-orange-200 space-y-2">
+                <button
+                  type="button"
+                  onClick={handleSendToWhatsApp}
+                  className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition active:scale-98 min-h-[44px] cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Kirim Data Registrasi ke WhatsApp Admin Sekarang</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={handleFinishAndReturn}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-md border border-orange-600 flex items-center justify-center gap-2 transition active:scale-98 min-h-[46px] cursor-pointer"
+                  className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md border border-orange-600 flex items-center justify-center gap-2 transition active:scale-98 min-h-[44px] cursor-pointer"
                 >
-                  <CheckCircle2 className="w-5 h-5 text-white" />
+                  <CheckCircle2 className="w-4 h-4 text-white" />
                   <span>Selesai & Kembali ke Form Pendataan Warga</span>
                 </button>
               </div>

@@ -13,13 +13,16 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Share2,
+  QrCode
 } from 'lucide-react';
 import { WargaKatolik, AgamaType } from '../types';
 import { exportWargaToExcel } from '../utils/excelExport';
 import { hapusWarga, updateWarga, kosongkanSemuaWarga, resetKeDataDemo, syncWithServer } from '../utils/storage';
 import { urutkanWargaSusunanKeluarga } from '../utils/familySort';
 import { SapaLogo } from './SapaLogo';
+import { HimpunDataModal } from './HimpunDataModal';
 
 interface AdminTableProps {
   wargaList: WargaKatolik[];
@@ -46,6 +49,7 @@ export const AdminTable: React.FC<AdminTableProps> = ({
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [himpunModalOpen, setHimpunModalOpen] = useState(false);
 
   const agamaList: AgamaType[] = [
     'Katolik',
@@ -190,8 +194,18 @@ export const AdminTable: React.FC<AdminTableProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons: Tarik Data, Add Warga, Export Excel, Kosongkan Data / Reset Demo */}
+        {/* Action Buttons: Himpun Data, Tarik Data Server, Add Warga, Export Excel */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Tombol Utama: Tarik & Himpun Data dari HP Warga */}
+          <button
+            onClick={() => setHimpunModalOpen(true)}
+            className="flex-1 md:flex-none px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md border-2 border-emerald-300 flex items-center justify-center gap-1.5 transition min-h-[44px] cursor-pointer"
+            title="Tarik & himpun data yang diinput warga (via WhatsApp, Scan QR HP Warga, atau Berkas)"
+          >
+            <Share2 className="w-4 h-4 text-emerald-100" />
+            <span>Himpun Data Warga</span>
+          </button>
+
           {/* Tombol Refresh / Tarik Data dari Server */}
           <button
             onClick={handleManualRefresh}
@@ -766,6 +780,16 @@ export const AdminTable: React.FC<AdminTableProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Himpun Data Warga dari HP / WhatsApp / Scan QR */}
+      <HimpunDataModal
+        isOpen={himpunModalOpen}
+        onClose={() => setHimpunModalOpen(false)}
+        onDataImported={(cnt) => {
+          showToast(`Berhasil menghimpun ${cnt} data jemaat ke database admin!`);
+          syncWithServer(true);
+        }}
+      />
 
       {/* Floating Success Toast */}
       {successToast && (

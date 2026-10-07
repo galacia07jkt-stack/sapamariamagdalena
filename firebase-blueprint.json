@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "WargaKatolik": {
+      "title": "WargaKatolik",
+      "description": "Data pendaftaran warga jemaat Katolik lingkungan St. Maria Magdalena Semampir",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID unik registrasi"
+        },
+        "noKk": {
+          "type": "string",
+          "description": "Nomor Kartu Keluarga"
+        },
+        "nik": {
+          "type": "string",
+          "description": "Nomor Induk Kependudukan"
+        },
+        "namaLengkap": {
+          "type": "string",
+          "description": "Nama lengkap warga"
+        },
+        "agama": {
+          "type": "string",
+          "description": "Agama warga"
+        },
+        "namaBaptis": {
+          "type": "string",
+          "description": "Nama baptis"
+        },
+        "jenisKelamin": {
+          "type": "string",
+          "description": "Jenis kelamin (L atau P)"
+        },
+        "tempatLahir": {
+          "type": "string",
+          "description": "Tempat lahir"
+        },
+        "tanggalLahir": {
+          "type": "string",
+          "description": "Tanggal lahir"
+        },
+        "alamatDomisili": {
+          "type": "string",
+          "description": "Alamat domisili"
+        },
+        "rtRw": {
+          "type": "string",
+          "description": "RT/RW domisili"
+        },
+        "hubunganKeluarga": {
+          "type": "string",
+          "description": "Hubungan dalam keluarga"
+        },
+        "statusPerkawinan": {
+          "type": "string",
+          "description": "Status perkawinan"
+        },
+        "statusVerifikasi": {
+          "type": "string",
+          "description": "Status verifikasi admin"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Waktu pembuatan"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Waktu pembaruan"
+        }
+      },
+      "required": ["id", "noKk", "nik", "namaLengkap"]
+    }
+  },
+  "firestore": {
+    "/warga/{wargaId}": {
+      "schema": "WargaKatolik",
+      "description": "Koleksi data pendaftaran jemaat Katolik lingkungan St. Maria Magdalena yang tersinkronisasi online secara terpadu"
+    }
+  }
+}
